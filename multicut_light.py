@@ -14,11 +14,8 @@ C_RED   = "\033[41;37;1m"
 C_BLUE  = "\033[44;37;1m"
 
 
-multicut_light_date = "21.01.2010"
+multicut_light_date = "10.03.2010"
 prog_id = "multicut_light.py/%s" % multicut_light_date
-
-nachlauf=5						# Nachlauf zum Ueberpruefen mit dem mplayer
-vorlauf=10						# Vorlauf zum Ueberpruefen mit dem mplayer
 
 
 prog_help = \
@@ -151,15 +148,16 @@ class CutList:
 			except:
 				pass
 		
-		errorline = ""
 		if self.attr["errors"] != "000000":
-			errorline = "	Fehler:    @RED "
-			errors = ["Anfang fehlt!", "Ende fehlt!", "Video!", "Audio!", "Fehler: %s" % self.attr["othererrordescription"], "EPG"]
+			errortext = ["Anfang fehlt!", "Ende fehlt!", "Video!", "Audio!", "Fehler: %s" % self.attr["othererrordescription"], "EPG"]
+			errors = []
 			for i, c in enumerate(self.attr["errors"]):
 				if c != '0':
-					errorline += errors[i] + " "
-			errorline += " @CLEAR\n"
-
+					errors.append(errortext[i])
+			errorline += "	Fehler:    @RED %s @CLEAR\n" % " ".join(errors)
+		else:
+			errorline = ""
+		
 		outtxt =  "%s\n" % self.attr["metarating"]\
 		+ "@RED %s @CLEAR	Schnitte:  @BLUE %s @CLEAR (%s)	Spielzeit: @BLUE %s @CLEAR (hh:mm:ss)\n" % (number, cuts, cutsformat, duration) \
 		+ "	Bewertung: @BLUE %s (%s/%s) @CLEAR    	Autor:     @BLUE %s (%s) @CLEAR\n" % (rating, self.attr["ratingcount"], self.attr["downloadcount"], author, self.attr["ratingbyauthor"])\
@@ -304,12 +302,12 @@ class CutOptions:
 		for avidemux in avidemux_cmds:
 			try:
 				out = Run(avidemux, ["--quit"])[0]
-				self.avidemux = avidemux
+				self.cmd_AviDemux = avidemux
 				if "Avidemux v2.5" in out:
-					self.avidemux_version = "2.5"
+					self.cmd_AviDemux_version = "2.5"
 					break
 				elif "Avidemux v2.4" in out:
-					self.avidemux_version = "2.4"
+					self.cmd_AviDemux_version = "2.4"
 					break
 				else:
 					continue # do not use
@@ -323,8 +321,15 @@ class CutOptions:
 		print "Using as uncut directory: %s" % self.uncutdir
 		print "Using as cutnameformat: %s" % self.cutnameformat
 		print "Using as uncutnameformat: %s" % self.uncutnameformat
-		print "Using as avidemux: %s (v:%s)" % (self.avidemux, self.avidemux_version)
-		print "Using as VirtualDub: %s" % self.virtualdub
+		print "Using as AviDemux: %s (v:%s)" % (self.cmd_AviDemux, self.cmd_AviDemux_version)
+		print "Using as VirtualDub: %s" % self.cmd_VirtualDub
+		
+		self.DefaultProjectClass = AviDemuxProjectClass
+		self.RegisteredProjects = {}
+		if self.cmd_Virtualdub:
+			self.RegisteredProjectClasses[".mpg.HQ.avi"] = VDProjectClass
+			self.RegisteredProjectClasses[".mpg.HD.avi"] = VDProjectClass
+		
 		
 	def ParseConfig(self, config):
 		home = os.getenv("HOME") + '/'
@@ -338,7 +343,7 @@ class CutOptions:
 					elif line.startswith("uncutdir"):
 						self.uncutdir= opt.replace("~/", home)
 					elif line.startswith("virtualdub"):
-						self.virtualdub = opt.replace("~/", home)
+						self.cmd_VirtualDub = opt.replace("~/", home)
 					elif line.startswith("cutname"):
 						self.cutnameformat = opt
 					elif line.startswith("uncutname"):
@@ -434,54 +439,19 @@ class CutFile:
 		print "%s Schneide %s %s" % (C_RED, self.filename, C_CLEAR)
 		print "Ausgabename: %s" % self.cutname
 		
-		cutlisttxt = self.cutlist.GetCutList()
 		
-		fps = self.cutlist.GetFPS()
-		StartInFrames, DurationInFrames = self.cutlist.TimesInFrames()
-
-		if not (self.cutoptions.virtualdub and (".mpg.HQ.avi" in self.filename or ".mpg.HD.avi" in self.filename)):
-			# avidemux
-			print "Schneide mit Avidemux"
-			print "Framerate    : %g fps" % fps
-
-			project = AviDemuxProject(self.cutoptions)
-			project.Start(self.path)
-			
-			if self.GetAspect() == 1:
-				print "Aspect Ratio : 4:3"
-			else:
-				print "Aspect Ratio : 16:9"
-			
-			for start, duration in zip(StartInFrames, DurationInFrames):
-				project.Append("app.addSegment(0,%d,%d);" % (start, duration))
-			
-			project.End(self.cutpath, fps)
+		for extension, registeredclass in self.cutoptions.RegisteredProjectClasses.items():
+			if extension in self.filename:
+				projectclass = registeredclass
 		else:
-			# virtual dub
-			print "Schneide mit VirtualDub"
-			print "Framerate    : %g fps" % fps
-			
-			project = VDProject(self.cutoptions)
-			
-			project.Start(self.path)
-			
-			if self.GetAspect() == 1:
-				print "Aspect Ratio : 4:3"
-				project.SetAspectRatio("4:3")
-			else:
-				print "Aspect Ratio : 16:9"
-				project.SetAspectRatio("16:9")
-			
-			project.Append("VirtualDub.subset.Clear();")
-			
-			for start, duration in zip(StartInFrames, DurationInFrames):
-				project.Append("VirtualDub.subset.AddRange(%d,%d);" % (start, duration))
-			
-			project.End(self.cutpath)
+			projectclass = self.cutoptions.DefaultProjectClass
 		
-		# run
-		project.Run()
-			
+		project = projectclass(self, self.cutlist, self.cutoptions)
+		
+		print "Schneide mit %s" % project.Name()
+		print "Framerate: %g fps" % self.cutlist.GetFPS()
+		
+		project.Run() # run
 			
 		if os.path.isfile(self.cutpath):
 			os.rename(self.path, self.uncutpath)
@@ -508,82 +478,102 @@ class CutFile:
 		return 1
 		
 
-class AviDemuxProject:
-	def __init__(self, cutoptions):
+class AviDemuxProjectClass:
+	def __init__(self, cutfile, cutlist, cutoptions):
 		self.cutoptions = cutoptions
 		self.filename = self.cutoptions.tempdir + "project.js"
+
+		self.Start(cutfile.path)
+		
+		StartInFrames, DurationInFrames = cutlist.TimesInFrames()
+		for start, duration in zip(StartInFrames, DurationInFrames):
+			self.Append("app.addSegment(0,%d,%d);" % (start, duration))
+		
+		self.End(cutfile.cutpath, cutlist.GetFPS(), cutoptions.cmd_AviDemux_version )
+
+	def Name(self):
+		return "Avidemux"
 	
 	def Write(self, text, mode = "a"):
 		open(self.filename, mode).write(text)
 	
 	def Start(self,path):
-		text = """
-//AD
-var app = new Avidemux();
-//** Video **
-// 01 videos source
-app.load("%s");
-
-// 02 segments
-app.clearSegments();
-""" % path
+		text = 	'//AD\n' \
+			 +	'var app = new Avidemux();\n' \
+			 +	'//** Video **\n' \
+			 +	'// 01 videos source\n' \
+			 +	'app.load("%s");\n' % path \
+			 + 	'\n' \
+			 +	'// 02 segments\n' \
+			 +	'app.clearSegments();\n'
 		self.Write(text,"w")
 	
 	def Append(self, append):
 		self.Write(append + "\n")
 	
-	def End(self,cutpath,fps):
-		if self.cutoptions.avidemux_version == "2.5":
-			text = """
-app.video.setPostProc(3,3,0);
-app.video.fps1000=%d;
-app.video.codec("Copy","CQ=4","0 ");
-app.audio.reset();
-app.audio.codec("copy",128,0,"");
-app.audio.normalizeMode=0;
-app.audio.normalizeValue=0;
-app.audio.delay=0;
-app.audio.mixer="NONE";
-app.audio.scanVBR="";
-app.setContainier="AVI";
-setSuccess(app.save("%s"));
-""" % (fps*1000, cutpath)
+	def End(self,version,cutpath,fps):
+		if version == "2.5":
+			text = 	'app.video.setPostProc(3,3,0);\n' \
+				+	'app.video.fps1000=%d;\n' % (fps*1000) \
+				+	'app.video.codec("Copy","CQ=4","0 ");\n' \
+				+	'app.audio.reset();\n' \
+				+ 	'app.audio.codec("copy",128,0,"");\n' \
+				+	'app.audio.normalizeMode=0;\n' \
+				+	'app.audio.normalizeValue=0;\n' \
+				+	'app.audio.delay=0;\n' \
+				+	'app.audio.mixer="NONE";\n' \
+				+	'app.audio.scanVBR="";\n' \
+				+	'app.setContainier="AVI";\n' \
+				+ 	'setSuccess(app.save("%s"));\n' % cutpath
 		else:
-			text = """
-app.video.setPostProc(3,3,0);
-app.video.setFps1000(%d);
-app.video.codec("Copy","CQ=4","0 ");
-app.audio.reset();
-app.audio.codec("copy",128,0,"");
-app.audio.normalizeMode=0;
-app.audio.normalizeValue=0;
-app.audio.delay=0;
-app.audio.mixer("NONE");
-app.audio.scanVBR();
-app.setContainer("AVI");
-setSuccess(app.save("%s"));
-""" % (fps*1000, cutpath)
+			text = 	'app.video.setPostProc(3,3,0);\n' \
+				+	'app.video.setFps1000(%d);\n' % (fps*1000) \
+				+	'app.video.codec("Copy","CQ=4","0 ");\n' \
+				+	'app.audio.reset();\n' \
+				+ 	'app.audio.codec("copy",128,0,"");\n' \
+				+	'app.audio.normalizeMode=0;\n' \
+				+	'app.audio.normalizeValue=0;\n' \
+				+	'app.audio.delay=0;\n' \
+				+	'app.audio.mixer("NONE");\n' \
+				+	'app.audio.scanVBR();\n' \
+				+	'app.setContainer("AVI");\n' \
+				+ 	'setSuccess(app.save("%s"));\n' % cutpath
 		self.Write(text,"a")
 	
 	def Run(self):
-		return Run(self.cutoptions.avidemux, ["--force-smart", "--run", self.filename, "--quit"])
+		return Run(self.cutoptions.cmd_AviDemux, ["--force-smart", "--run", self.filename, "--quit"])
 
-class VDProject:
-	def __init__(self, cutoptions):
+class VDProjectClass:
+	def __init__(self, cutfile, cutlist, cutoptions):
 		self.cutoptions = cutoptions
 		self.filename = self.cutoptions.tempdir + "project.syl"
+			
+		self.Start(cutfile.path)
+			
+		if cutfile.GetAspect() == 1:
+			self.SetAspectRatio("4:3")
+		else:
+			self.SetAspectRatio("16:9")
+			
+		self.Append("VirtualDub.subset.Clear();")
+		StartInFrames, DurationInFrames = cutlist.TimesInFrames()
+		for start, duration in zip(StartInFrames, DurationInFrames):
+			self.Append("VirtualDub.subset.AddRange(%d,%d);" % (start, duration))
+			
+		self.End(cutfile.cutpath)
 
+	def Name(self):
+		return "VirtualDub"
+		
 	def Write(self, text, mode = "a"):
 		open(self.filename, mode).write(text)
 
 	def Start(self, path):
-		text = """
-VirtualDub.Open("%s",0,0);
-VirtualDub.audio.SetMode(0);
-VirtualDub.video.SetMode(1);
-VirtualDub.video.SetSmartRendering(1);
-VirtualDub.video.SetCompression(0x53444646,0,10000,0);
-""" % path
+		text = 	'VirtualDub.Open("%s",0,0);\n' % path \
+			 +	'VirtualDub.audio.SetMode(0);\n' \
+			 +	'VirtualDub.video.SetMode(1);\n' \
+			 +	'VirtualDub.video.SetSmartRendering(1);\n' \
+			 +	'VirtualDub.video.SetCompression(0x53444646,0,10000,0);\n'
 		self.Write(text, "w")
 		
 	def Append(self, append):
@@ -601,22 +591,20 @@ VirtualDub.video.SetCompression(0x53444646,0,10000,0);
 			self.Append('VirtualDub.video.SetCompData(2951,"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");')
 
 	def End(self, cutpath):
-		text = """
-VirtualDub.SaveAVI("%s");
-VirtualDub.Close();
-""" % cutpath
+		text =	'VirtualDub.SaveAVI("%s");\n' % cutpath \
+			 +	'VirtualDub.Close();\n'
 		self.Write(text)
 
 	def Run(self):
 		os.chdir(self.cutoptions.tempdir)
 
-		sub = subprocess.Popen(args = "wine %s /s project.syl" % self.cutoptions.virtualdub, shell = True, stderr = subprocess.PIPE, stdout = subprocess.PIPE)
-			
+		sub = subprocess.Popen(args = "wine %s /s project.syl" % self.cutoptions.cmd_VirtualDub, shell = True, stderr = subprocess.PIPE, stdout = subprocess.PIPE)
+		
 		errtext = ''
 		while True:
 			errtext += sub.stderr.read(1)
 			if 'fixme:avifile:AVIFileExit' in errtext:
-				sub.send_signal(9) # python >2.6
+				sub.send_signal(9) # python >=2.6
 				break
 
 

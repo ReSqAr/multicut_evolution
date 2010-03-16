@@ -14,7 +14,7 @@ C_RED   = "\033[41;37;1m"
 C_BLUE  = "\033[44;37;1m"
 
 
-multicut_light_date = "10.03.2010"
+multicut_light_date = "16.03.2010"
 prog_id = "multicut_light.py/%s" % multicut_light_date
 
 
@@ -325,8 +325,8 @@ class CutOptions:
 		print "Using as VirtualDub: %s" % self.cmd_VirtualDub
 		
 		self.DefaultProjectClass = AviDemuxProjectClass
-		self.RegisteredProjects = {}
-		if self.cmd_Virtualdub:
+		self.RegisteredProjectClasses = {}
+		if self.cmd_VirtualDub:
 			self.RegisteredProjectClasses[".mpg.HQ.avi"] = VDProjectClass
 			self.RegisteredProjectClasses[".mpg.HD.avi"] = VDProjectClass
 		
@@ -443,6 +443,7 @@ class CutFile:
 		for extension, registeredclass in self.cutoptions.RegisteredProjectClasses.items():
 			if extension in self.filename:
 				projectclass = registeredclass
+				break
 		else:
 			projectclass = self.cutoptions.DefaultProjectClass
 		
@@ -470,12 +471,12 @@ class CutFile:
 	def GetAspect(self):
 		out = Run("mplayer",  ["-vo", "null", "-nosound", "-frames", "1", self.path])[0]
 		if "Movie-Aspect is 1.33:1" in out or "Film-Aspekt ist 1.33:1" in out:
-			return 1
+			return "4:3"
 		if "Movie-Aspect is 0.56:1" in out or "Film-Aspekt ist 0.56:1" in out:
-			return 2
+			return "16:9"
 		if "Movie-Aspect is 1.78:1" in out or "Film-Aspekt ist 1.78:1" in out:
-			return 2
-		return 1
+			return "16:9"
+		return "4:3"
 		
 
 class AviDemuxProjectClass:
@@ -489,7 +490,7 @@ class AviDemuxProjectClass:
 		for start, duration in zip(StartInFrames, DurationInFrames):
 			self.Append("app.addSegment(0,%d,%d);" % (start, duration))
 		
-		self.End(cutfile.cutpath, cutlist.GetFPS(), cutoptions.cmd_AviDemux_version )
+		self.End(cutfile.cutpath, cutoptions.cmd_AviDemux_version, cutlist.GetFPS())
 
 	def Name(self):
 		return "Avidemux"
@@ -511,7 +512,7 @@ class AviDemuxProjectClass:
 	def Append(self, append):
 		self.Write(append + "\n")
 	
-	def End(self,version,cutpath,fps):
+	def End(self,cutpath,version,fps):
 		if version == "2.5":
 			text = 	'app.video.setPostProc(3,3,0);\n' \
 				+	'app.video.fps1000=%d;\n' % (fps*1000) \
@@ -550,10 +551,7 @@ class VDProjectClass:
 			
 		self.Start(cutfile.path)
 			
-		if cutfile.GetAspect() == 1:
-			self.SetAspectRatio("4:3")
-		else:
-			self.SetAspectRatio("16:9")
+		self.SetAspectRatio(cutfile.GetAspect())
 			
 		self.Append("VirtualDub.subset.Clear();")
 		StartInFrames, DurationInFrames = cutlist.TimesInFrames()

@@ -14,27 +14,30 @@ C_RED   = "\033[41;37;1m"
 C_BLUE  = "\033[44;37;1m"
 
 
-multicut_light_date = "16.03.2010"
+multicut_light_date = "17.03.2010"
 prog_id = "multicut_light.py/%s" % multicut_light_date
-
+VERBOSITY_LEVEL = 0
 
 prog_help = \
 """
 Hilfe für multicut_light.py (%s):
 
-multicut_light.py [--help] [--nocheck] [--config $name] $file1 ...
+multicut_light.py [--help] [--nocheck] [--verbosity $d] [--config $name] $file1 ...
 
 Die übergebenden Dateien werden geschnitten. Optionen:
-	--help:
+	--help
 		Zeigt dise Hilfe an
 
-	--nocheck:
+	--nocheck
 		Geschnittene Dateien werden nicht zur Überprüfung 
 		wiedergegeben.
 
 	--config $name
 		Gibt den Namen der zu verwendenden Konfigurationsdatei an.
 		[default: ~/.multicut_light.conf]
+	--verbosity $d
+		Debuginformationen werden entsprechend ausgegeben.
+		[default: 0, maximal 5]
 
 In der Konfigurationsdatei zur Verfügung stehenden Einstellungen:
 	cutdir= 
@@ -71,11 +74,18 @@ Nichts:		Überspringt die Datei
 avidemux_cmds = ["avidemux2_cli", "avidemux_cli", "avidemux2", "avidemux", "avidemux2_gtk", "avidemux_gtk", "avidemux2_qt4", "avidemux_qt4"]
 
 
+def Debug(level, text):
+	if level <= VERBOSITY_LEVEL:
+		print "Debug (%d): %s" % (level,text)
 
 
 def Run(cmd, args):
+	Debug(2, "running %s with args %s" % (cmd,args))
 	sub = subprocess.Popen(args = [cmd] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)	
-	return sub.communicate() # out, err
+	out, err = sub.communicate()
+	Debug(4, "errout: %s" % err)
+	Debug(5, "out: %s" % out)
+	return out, err
 
 
 class CutList:
@@ -264,11 +274,15 @@ class CutListAT:
 	
 	def GetCutList(self, cl_id):
 		if cl_id not in self.CL_Cache:
+			Debug(2, "cutlist: cache miss: %s" % cl_id)
 			url = "getfile.php?id=%s" % cl_id
 			self.CL_Cache[cl_id] = unicode(self.Get(url), "iso-8859-1")
+		else:
+			Debug(2, "cutlist: cache hit: %s" % cl_id)
 		return self.CL_Cache[cl_id]
 	
 	def RateCutList(self, cl_id, rating):
+		Debug(2, "rate cutlist %s with %d" % (cl_id, rating))
 		url = "rate.php?rate=%s&rating=%d" % (cl_id, rating)
 		return self.Get(url)
 		
@@ -334,6 +348,7 @@ class CutOptions:
 	def ParseConfig(self, config):
 		home = os.getenv("HOME") + '/'
 		config = config.replace("~/", home)
+		Debug(1, "open config %s" % config)
 		try:
 			for line in open(config):
 				try:
@@ -542,6 +557,7 @@ class AviDemuxProjectClass:
 		self.Write(text,"a")
 	
 	def Run(self):
+		Debug(1, "starting avidemux")
 		return Run(self.cutoptions.cmd_AviDemux, ["--force-smart", "--run", self.filename, "--quit"])
 
 class VDProjectClass:
@@ -596,11 +612,16 @@ class VDProjectClass:
 	def Run(self):
 		os.chdir(self.cutoptions.tempdir)
 
+		Debug(1, "starting vd")
+		
 		sub = subprocess.Popen(args = "wine %s /s project.syl" % self.cutoptions.cmd_VirtualDub, shell = True, stderr = subprocess.PIPE, stdout = subprocess.PIPE)
 		
 		errtext = ''
 		while True:
-			errtext += sub.stderr.read(1)
+			adderrtxt = sub.stderr.read(1)
+			if adderrtxt == '\n':
+				Debug(4, errtext.rpartition('\n')[-1])
+			errtext += adderrtxt
 			if 'fixme:avifile:AVIFileExit' in errtext:
 				sub.send_signal(9) # python >=2.6
 				break
@@ -608,7 +629,7 @@ class VDProjectClass:
 
 def main():
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "nocheck","config="])
+		opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "nocheck","config=","verbosity="])
 	except getopt.GetoptError, err:
 		print C_RED + str(err) + C_CLEAR # will print something like "option -a not recognized"
 		print prog_help
@@ -621,10 +642,14 @@ def main():
 		if o in ("-h", "--help"):
 			print prog_help
 			sys.exit()
-		elif o in ("--nocheck"):
+		elif o in ("--nocheck",):
 			check_cut_files = False
-		elif o in ("--config"):
+		elif o in ("--config",):
 			configfile = a
+		elif o in ("--verbosity",):
+			global VERBOSITY_LEVEL
+			VERBOSITY_LEVEL = int(a)
+			print "Setze verbosity auf %d" % VERBOSITY_LEVEL
 	
 	if not args:
 		print C_RED + "Fehler: Keine Dateien übergeben" + C_CLEAR

@@ -14,7 +14,7 @@ C_RED   = "\033[41;37;1m"
 C_BLUE  = "\033[44;37;1m"
 
 
-multicut_light_date = "17.03.2010"
+multicut_light_date = "27.03.2010"
 prog_id = "multicut_light.py/%s" % multicut_light_date
 VERBOSITY_LEVEL = 0
 
@@ -164,7 +164,7 @@ class CutList:
 			for i, c in enumerate(self.attr["errors"]):
 				if c != '0':
 					errors.append(errortext[i])
-			errorline += "	Fehler:    @RED %s @CLEAR\n" % " ".join(errors)
+			errorline = "	Fehler:    @RED %s @CLEAR\n" % " ".join(errors)
 		else:
 			errorline = ""
 		

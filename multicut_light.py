@@ -14,7 +14,7 @@ C_RED   = "\033[41;37;1m"
 C_BLUE  = "\033[44;37;1m"
 
 
-multicut_light_date = "27.03.2010"
+multicut_light_date = "12.04.2010"
 prog_id = "multicut_light.py/%s" % multicut_light_date
 VERBOSITY_LEVEL = 0
 
@@ -346,8 +346,7 @@ class CutOptions:
 		
 		
 	def ParseConfig(self, config):
-		home = os.getenv("HOME") + '/'
-		config = config.replace("~/", home)
+		config = os.path.expanduser(config)
 		Debug(1, "open config %s" % config)
 		try:
 			for line in open(config):

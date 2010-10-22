@@ -684,12 +684,28 @@ def main():
 	print
 	print "Schneide %d Datei(en)" % len(cutfiles)
 
+	errors = []
+	
 	for i,c in enumerate(cutfiles):
 		print
 		print "%d von %d" % (i+1, len(cutfiles))
-		if c.Cut():
-			checkfiles.append(c)
-
+		try:
+			if c.Cut():
+				checkfiles.append(c)
+		except StandardError,e:
+			print e
+			print "Life has to go on..."
+			errors.append( (e,c) )
+	
+	try:
+		if errors:
+			for e,c in errors:
+				print 70*'#'
+				print e
+				print c.filename
+	except:
+		print "Fehler während dem Anzeigen von Fehlern..."
+		
 	if check_cut_files:
 		###
 		# show files

@@ -445,10 +445,12 @@ class CutFile:
 
 
 	def Cut(self):		
-		self.cutname =   self.cutoptions.FormatString("cutname",   (self.cutlist, self.filename))
+		self.cutname = self.cutoptions.FormatString("cutname",   (self.cutlist, self.filename))
+		self.tmpname = "$$$$-" + self.cutname 
 		self.uncutname = self.cutoptions.FormatString("uncutname", (self.cutlist, self.filename))
 		
 		self.cutpath = self.cutoptions.cutdir + self.cutname
+		self.tmppath = self.cutoptions.cutdir + self.tmpname
 		self.uncutpath = self.cutoptions.uncutdir + self.uncutname
 
 		print "%s Schneide %s %s" % (C_RED, self.filename, C_CLEAR)
@@ -469,8 +471,9 @@ class CutFile:
 		
 		project.Run() # run
 			
-		if os.path.isfile(self.cutpath):
+		if os.path.isfile(self.tmppath):
 			os.rename(self.path, self.uncutpath)
+			os.rename(self.tmppath, self.cutpath)
 			return True
 		else:
 			print "Schneiden war nicht erfolgreich"
@@ -505,7 +508,7 @@ class AviDemuxProjectClass:
 		for start, duration in zip(StartInFrames, DurationInFrames):
 			self.Append("app.addSegment(0,%d,%d);" % (start, duration))
 		
-		self.End(cutfile.cutpath, cutoptions.cmd_AviDemux_version, cutlist.GetFPS())
+		self.End(cutfile.tmppath, cutoptions.cmd_AviDemux_version, cutlist.GetFPS())
 
 	def Name(self):
 		return "Avidemux"
@@ -527,7 +530,7 @@ class AviDemuxProjectClass:
 	def Append(self, append):
 		self.Write(append + "\n")
 	
-	def End(self,cutpath,version,fps):
+	def End(self,tmppath,version,fps):
 		if version == "2.5":
 			text = 	'app.video.setPostProc(3,3,0);\n' \
 				+	'app.video.fps1000=%d;\n' % (fps*1000) \
@@ -553,7 +556,7 @@ class AviDemuxProjectClass:
 				+	'app.audio.mixer("NONE");\n' \
 				+	'app.audio.scanVBR();\n' \
 				+	'app.setContainer("AVI");\n' \
-				+ 	'setSuccess(app.save("%s"));\n' % cutpath
+				+ 	'setSuccess(app.save("%s"));\n' % tmppath
 		self.Write(text,"a")
 	
 	def Run(self):
@@ -574,7 +577,7 @@ class VDProjectClass:
 		for start, duration in zip(StartInFrames, DurationInFrames):
 			self.Append("VirtualDub.subset.AddRange(%d,%d);" % (start, duration))
 			
-		self.End(cutfile.cutpath)
+		self.End(cutfile.tmppath)
 
 	def Name(self):
 		return "VirtualDub"

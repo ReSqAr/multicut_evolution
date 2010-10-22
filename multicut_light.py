@@ -295,7 +295,7 @@ class CutOptions:
 		self.cutdir  = os.getcwd()
 		self.uncutdir= os.getcwd()
 
-		self.virtualdub = None
+		self.cmd_VirtualDub = None
 
 		self.cutnameformat = "{base}-cut{rating}.{ext}"
 		self.uncutnameformat = "{full}"
@@ -353,11 +353,11 @@ class CutOptions:
 				try:
 					opt = line.split("=",1)[1].strip()
 					if line.startswith("cutdir"):
-						self.cutdir  = opt.replace("~/", home)
+						self.cutdir  = os.path.expanduser(opt)
 					elif line.startswith("uncutdir"):
-						self.uncutdir= opt.replace("~/", home)
+						self.uncutdir= os.path.expanduser(opt)
 					elif line.startswith("virtualdub"):
-						self.cmd_VirtualDub = opt.replace("~/", home)
+						self.cmd_VirtualDub = os.path.expanduser(opt)
 					elif line.startswith("cutname"):
 						self.cutnameformat = opt
 					elif line.startswith("uncutname"):
@@ -366,8 +366,9 @@ class CutOptions:
 						self.time_before_cut = int(opt)
 					elif line.startswith("nachlauf"):
 						self.time_after_cut  = int(opt)
-				except:
-					pass
+				except StandardError, e:
+					print "ConfigParse: Could not parse '%s' due to:" % line
+					print e
 		except:
 			pass
 	

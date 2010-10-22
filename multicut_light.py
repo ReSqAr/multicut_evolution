@@ -614,10 +614,13 @@ class VDProjectClass:
 
 		Debug(1, "starting vd")
 		
-		sub = subprocess.Popen(args = "wine %s /s project.syl" % self.cutoptions.cmd_VirtualDub, shell = True, stderr = subprocess.PIPE, stdout = subprocess.PIPE)
+		sub = subprocess.Popen(args = "wine %s /x /s project.syl" % self.cutoptions.cmd_VirtualDub, shell = True, stderr = subprocess.PIPE, stdout = subprocess.PIPE)
 		
 		errtext = ''
 		while True:
+			if sub.poll() != None:
+				break
+			
 			adderrtxt = sub.stderr.read(1)
 			if adderrtxt == '\n':
 				Debug(4, errtext.rpartition('\n')[-1])

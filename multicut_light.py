@@ -3,6 +3,7 @@
 
 import subprocess
 import os
+import time
 import tempfile
 import urllib2
 import re
@@ -244,7 +245,10 @@ class CutList:
 		print text.replace("@BLUE", C_BLUE).replace("@RED", C_RED).replace("@CLEAR", C_CLEAR)
 
 		print "Wertung: ",
-		inp = sys.stdin.readline()[:-1]# without newline
+		try:
+			inp = sys.stdin.readline()[:-1]# without newline
+		except StandardError:
+			sys.exit()
 		inp = inp.strip()
 		print
 		if inp:
@@ -469,7 +473,10 @@ class CutFile:
 		print "Schneide mit %s" % project.Name()
 		print "Framerate: %g fps" % self.cutlist.GetFPS()
 		
+		start = time.time()
 		project.Run() # run
+		end = time.time()
+		print "Fertig, benötigte Zeit: %ds" % int(end-start)
 			
 		if os.path.isfile(self.tmppath):
 			os.rename(self.path, self.uncutpath)
@@ -543,7 +550,7 @@ class AviDemuxProjectClass:
 				+	'app.audio.mixer="NONE";\n' \
 				+	'app.audio.scanVBR="";\n' \
 				+	'app.setContainier="AVI";\n' \
-				+ 	'setSuccess(app.save("%s"));\n' % cutpath
+				+ 	'setSuccess(app.save("%s"));\n' % tmppath
 		else:
 			text = 	'app.video.setPostProc(3,3,0);\n' \
 				+	'app.video.setFps1000(%d);\n' % (fps*1000) \

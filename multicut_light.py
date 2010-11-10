@@ -6,6 +6,7 @@ import os
 import time
 import tempfile
 import urllib2
+import codecs
 import re
 import sys
 import getopt
@@ -47,6 +48,8 @@ In der Konfigurationsdatei zur Verfügung stehenden Einstellungen:
 		Ausgabepfad für alte Dateien [default: .]
 	virtualdub=
 		Pfad von vdub.exe [default: None]
+	cachedir=
+		Pfad zu Cache [default: ~/.cache/mutlicut/]
 	vorlauf=
 		Vorlauf bei der Überprüfung [default: 10]
 	nachlauf=
@@ -140,7 +143,7 @@ class CutList:
 		Duration = [float(d) for d in Duration]
 		return Start, Duration
 
-	def CutListToText(self, n):
+	def CutListToConsoleText(self, n):
 		number = "[%d]" % n
 		
 		cuts   = self.attr["cuts"]   if self.attr["cuts"]   else "?"
@@ -266,6 +269,10 @@ class CutListAT:
 		self.opener.addheaders = [ ('User-agent', prog_id)]
 		self.cutoptions = cutoptions
 		self.CL_Cache = {}
+		self.CL_FC_Suffix = ".cutlist"
+		p = self.CL_FC_Suffix
+		self.CL_FileCache = [f[:-len(p)] for f in os.listdir(cutoptions.cachedir) if f.endswith(p)]\
+					if cutoptions.cachedir else []
 	
 	def Get(self, url):
 		return self.opener.open("http://www.cutlist.at/" + url).read()
@@ -279,8 +286,17 @@ class CutListAT:
 	def GetCutList(self, cl_id):
 		if cl_id not in self.CL_Cache:
 			Debug(2, "cutlist: cache miss: %s" % cl_id)
-			url = "getfile.php?id=%s" % cl_id
-			self.CL_Cache[cl_id] = unicode(self.Get(url), "iso-8859-1")
+			fname = self.cutoptions.cachedir + cl_id + self.CL_FC_Suffix
+			if cl_id in self.CL_FileCache:
+				Debug(2, "cutlist: found on disk: %s" % cl_id)
+				cutlist = codecs.open(fname, 'r', 'utf8').read()
+			else:
+				Debug(2, "cutlist: load from internet: %s" % cl_id)
+				url = "getfile.php?id=%s" % cl_id
+				cutlist = unicode(self.Get(url), "iso-8859-1")
+				# write cutlist on disk
+				codecs.open(fname, 'w', 'utf8').write(cutlist)
+			self.CL_Cache[cl_id] = cutlist
 		else:
 			Debug(2, "cutlist: cache hit: %s" % cl_id)
 		return self.CL_Cache[cl_id]
@@ -292,12 +308,11 @@ class CutListAT:
 		
 class CutOptions:
 	def __init__(self, class_cutlistprov, configfile = None):
-		self.cutlistprov = class_cutlistprov(self) #init prov
-
 		# init values
 		self.tempdir = tempfile.mkdtemp(prefix = "multicut")
 		self.cutdir  = os.getcwd()
 		self.uncutdir= os.getcwd()
+		self.cachedir= os.path.expanduser("~/.cache/mutlicut/")
 
 		self.cmd_VirtualDub = None
 
@@ -311,10 +326,18 @@ class CutOptions:
 			print "Parse Konfigurationsdatei: %s" % configfile
 			self.ParseConfig(configfile)
 
-
+		# enforce ending seperator
 		if not self.tempdir.endswith(os.sep):  self.tempdir  += os.sep
 		if not self.cutdir.endswith(os.sep):   self.cutdir   += os.sep
 		if not self.uncutdir.endswith(os.sep): self.uncutdir += os.sep
+		if not self.cachedir.endswith(os.sep): self.cachedir += os.sep
+		# enforce existance
+		dirs = [self.cutdir,self.uncutdir,self.cachedir]
+		for d in dirs:
+			if not os.path.exists(d):
+				Debug(4, "init: create directory: %s" % d)
+				os.makedirs(d)
+
 
 		# find avidemux
 		for avidemux in avidemux_cmds:
@@ -337,11 +360,14 @@ class CutOptions:
 		print "Using as temp directory: %s" % self.tempdir
 		print "Using as cut directory: %s" % self.cutdir
 		print "Using as uncut directory: %s" % self.uncutdir
+		print "Using as cache directory: %s" % self.cachedir
 		print "Using as cutnameformat: %s" % self.cutnameformat
 		print "Using as uncutnameformat: %s" % self.uncutnameformat
 		print "Using as AviDemux: %s (v:%s)" % (self.cmd_AviDemux, self.cmd_AviDemux_version)
 		print "Using as VirtualDub: %s" % self.cmd_VirtualDub
 		
+		self.cutlistprov = class_cutlistprov(self) #init prov
+
 		self.DefaultProjectClass = AviDemuxProjectClass
 		self.RegisteredProjectClasses = {}
 		if self.cmd_VirtualDub:
@@ -362,6 +388,9 @@ class CutOptions:
 						self.uncutdir= os.path.expanduser(opt)
 					elif line.startswith("virtualdub"):
 						self.cmd_VirtualDub = os.path.expanduser(opt)
+					elif line.startswith("cachedir"):
+						self.cachedir= os.path.expanduser(opt)
+
 					elif line.startswith("cutname"):
 						self.cutnameformat = opt
 					elif line.startswith("uncutname"):
@@ -419,7 +448,7 @@ class CutFile:
 		
 		
 		for i, cutlist in enumerate(self.cutlists):
-			print cutlist.CutListToText(i+1)
+			print cutlist.CutListToConsoleText(i+1)
 			
 		def InterpreteNumber(s):
 			try:

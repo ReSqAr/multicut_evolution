@@ -78,6 +78,9 @@ Nichts:		Überspringt die Datei
 avidemux_cmds = ["avidemux2_cli", "avidemux_cli", "avidemux2", "avidemux", "avidemux2_gtk", "avidemux_gtk", "avidemux2_qt4", "avidemux_qt4"]
 
 
+#
+# helper functions
+#
 def Debug(level, text):
 	if level <= VERBOSITY_LEVEL:
 		print "Debug (%d): %s" % (level,text)
@@ -91,7 +94,35 @@ def Run(cmd, args):
 	Debug(5, "out: %s" % out)
 	return out, err
 
+def ParseIIRange(iis):
+	return sum([ParseII(ii) for ii in iis.split(',')],[])
 
+def ParseII(ii):
+	"""
+	syntax:
+	$number
+	$a = a
+	$a - $b = a..b
+	$a - $s - $b = a, a+s, a+2s, ..., b
+	"""
+	a, step, b = 0, 1, 0
+	s = ii.split('-')
+	if len(s) == 1:
+		a,b = s+s
+	elif len(s) == 2:
+		a,b = s
+	elif len(s) == 3:
+		a,step,b = s
+	else:
+		raise ValueError("Too many '-'")
+	a,step,b = int(a), int(step), int(b)
+	return range(a,b+1,step)
+
+
+
+#
+# CutList Class
+#
 class CutList:
 	def __init__(self, cutlistprov, cutlist):
 		self.cutlistprov = cutlistprov
@@ -263,6 +294,9 @@ class CutList:
 			except:
 				pass
 
+#
+# CutListAT as CutlistProviderClass
+#
 class CutListAT:
 	def __init__(self, cutoptions):
 		self.opener = urllib2.build_opener()
@@ -305,7 +339,10 @@ class CutListAT:
 		Debug(2, "rate cutlist %s with %d" % (cl_id, rating))
 		url = "rate.php?rate=%s&rating=%d" % (cl_id, rating)
 		return self.Get(url)
-		
+
+#
+# CutOptions Class
+#
 class CutOptions:
 	def __init__(self, class_cutlistprov, configfile = None):
 		# init values
@@ -424,6 +461,9 @@ class CutOptions:
 		raise ValueError("'%s' is not valid" % name)
 		
 
+#
+# CutFile Class
+#
 class CutFile:
 	def __init__(self, path, cutoptions):
 		self.path = os.path.realpath(path)
@@ -533,6 +573,9 @@ class CutFile:
 		return "4:3"
 		
 
+#
+# AviDemuxProjectClass
+#
 class AviDemuxProjectClass:
 	def __init__(self, cutfile, cutlist, cutoptions):
 		self.cutoptions = cutoptions
@@ -599,6 +642,9 @@ class AviDemuxProjectClass:
 		Debug(1, "starting avidemux")
 		return Run(self.cutoptions.cmd_AviDemux, ["--force-smart", "--run", self.filename, "--quit"])
 
+#
+# VDProjectClass
+#
 class VDProjectClass:
 	def __init__(self, cutfile, cutlist, cutoptions):
 		self.cutoptions = cutoptions
@@ -701,21 +747,65 @@ def main():
 	
 	o = CutOptions(CutListAT, configfile)
 
-	cutfiles = []
-	checkfiles = []
 
 	###
 	# choose cutlists
 	###
+	avis = []
 	for avi in args:
 		if not avi.endswith(".avi"):
-			print "Non-Avi file: %s" % avi
+			print "Non-Avi file omitted: %s" % avi
 			continue
+		else:
+			avis.append(avi)
+	
+	avis.sort()
+	avis2Choose = avis
+	cutfiles = {}
+	while avis2Choose:
+		# choose
+		for avi in avis2Choose:
+			c = CutFile(avi, o)
+			if c.ChooseCutList():
+				cutfiles[avi] = c
+		print
+		print
+		print "Cutlists umwählen:"
+		# confirm selection
+		for i,avi in enumerate(avis):
+			aviname = os.path.basename(avi)
+			cut = 'x' if avi in cutfiles else ' '
+			print "[%2d] %s %s" % (i+1,cut,aviname)
+		print "[ a] alle neu wählen"
+		print "[ n] oder leere Eingabe: nichts neu wählen"
 		
-		c = CutFile(avi, o)
-		if c.ChooseCutList():
-			cutfiles.append(c)
+		avis2Choose = None
+		while True:
+			sys.stdout.write("Auswahl(1,1-3,1-2-9): ")
+			sys.stdout.flush()
+			s = sys.stdin.readline().strip()
+			if not s or 'n' in s:
+				break
+			elif 'a' in s:
+				avis2Choose = avis
+				break
+			else:
+				try:
+					iis = ParseIIRange(s)
+					iis = sorted(list(set(iis)))
+					iis = [i-1 for i in iis]
+					if not (0 <= min(iis) and max(iis) < len(avis)):
+						print "%sIhre Eingabe ist fehlerhaft, versuchen Sie es erneut.%s" %(C_RED,C_CLEAR)
+						continue
+					avis2Choose = [avis[i] for i in iis]
+					break
+				except:
+					print "%sEin Fehler ist aufgetreten, versuchen Sie es erneut.%s" %(C_RED,C_CLEAR)
+					continue
 
+		
+	cutfiles = cutfiles.values()
+	
 	###
 	# cut files
 	###
@@ -723,6 +813,7 @@ def main():
 	print
 	print "Schneide %d Datei(en)" % len(cutfiles)
 
+	checkfiles = []
 	errors = []
 	
 	for i,c in enumerate(cutfiles):

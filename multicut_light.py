@@ -4,6 +4,7 @@
 import subprocess
 import os
 import time
+import random
 import tempfile
 import urllib2
 import codecs
@@ -11,12 +12,13 @@ import re
 import sys
 import getopt
 
+
 C_CLEAR = "\033[0m"
 C_RED   = "\033[41;37;1m"
 C_BLUE  = "\033[44;37;1m"
 
 
-multicut_light_date = "12.04.2010"
+multicut_light_date = "11.11.2010"
 prog_id = "multicut_light.py/%s" % multicut_light_date
 VERBOSITY_LEVEL = 0
 
@@ -261,8 +263,9 @@ class CutList:
 				sub += "{%d}{%d}%s\n" % (frame-pre_frames,frame+post_frames,text)
 			
 		filename = os.path.basename(path)
-		edlfile = tempdir + filename + ".edl"
-		subfile = tempdir + filename + ".sub"
+		d = random.getrandbits(32)
+		edlfile = tempdir + "%d_%s.edl" % (d,filename)
+		subfile = tempdir + "%d_%s.sub" % (d,filename)
 		open(edlfile,"w").write(edl)
 		open(subfile,"w").write(sub)
 			
@@ -582,7 +585,7 @@ class CutFile:
 class AviDemuxProjectClass:
 	def __init__(self, cutfile, cutlist, cutoptions):
 		self.cutoptions = cutoptions
-		self.filename = self.cutoptions.tempdir + "project.js"
+		self.filename = self.cutoptions.tempdir + "%d_project.js" % random.getrandbits(32)
 
 		self.Start(cutfile.path)
 		
@@ -651,7 +654,8 @@ class AviDemuxProjectClass:
 class VDProjectClass:
 	def __init__(self, cutfile, cutlist, cutoptions):
 		self.cutoptions = cutoptions
-		self.filename = self.cutoptions.tempdir + "project.syl"
+		self.projectname = "%d_project.syl" % random.getrandbits(32)
+		self.filename = self.cutoptions.tempdir + self.projectname
 			
 		self.Start(cutfile.path)
 			
@@ -702,7 +706,8 @@ class VDProjectClass:
 
 		Debug(1, "starting vd")
 		
-		sub = subprocess.Popen(args = "wine %s /x /s project.syl" % self.cutoptions.cmd_VirtualDub, shell = True, stderr = subprocess.PIPE, stdout = subprocess.PIPE)
+		sub = subprocess.Popen(args = "wine %s /x /s %s" % (self.cutoptions.cmd_VirtualDub,self.projectname),
+											shell = True, stderr = subprocess.PIPE, stdout = subprocess.PIPE)
 		
 		errtext = ''
 		while True:
@@ -885,9 +890,7 @@ def main():
 			
 			if not avis2Check:
 				break
-			
-			print avis2Check
-			
+
 			for i,c in enumerate(avis2Check):
 				print
 				print "%d von %d" % (i+1, len(avis2Check))

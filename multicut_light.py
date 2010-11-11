@@ -10,7 +10,10 @@ import urllib2
 import codecs
 import re
 import sys
+import datetime
 import getopt
+import hashlib
+import ast
 
 
 C_CLEAR = "\033[0m"
@@ -53,6 +56,7 @@ In der Konfigurationsdatei zur Verfügung stehenden Einstellungen:
 		Pfad von vdub.exe [default: None]
 	cachedir=
 		Pfad zu Cache [default: ~/.cache/mutlicut/]
+		Ein leerer Pfad bedeutet kein Cachen.
 	vorlauf=
 		Vorlauf bei der Überprüfung [default: 10]
 	nachlauf=
@@ -80,8 +84,11 @@ Nichts:		Überspringt die Datei
 
 
 
-avidemux_cmds = ["avidemux2_cli", "avidemux_cli", "avidemux2", "avidemux", "avidemux2_gtk", "avidemux_gtk", "avidemux2_qt4", "avidemux_qt4"]
+avidemux_cmds = ["avidemux2_cli", "avidemux_cli", "avidemux2", "avidemux", 
+						"avidemux2_gtk", "avidemux_gtk", "avidemux2_qt4", "avidemux_qt4"]
 
+search_request_expire_period = datetime.timedelta(hours=2)
+cutlist_expire_period = datetime.timedelta(days=14)
 
 #
 # helper functions
@@ -123,7 +130,116 @@ def ParseII(ii):
 	a,step,b = int(a), int(step), int(b)
 	return range(a,b+1,step)
 
+#
+# Helper Class
+#
+class FileCache:
+	def __init__(self, name, directory, getter, expireperiod=None, debug=lambda x:None):
+		self.name = name
+		self.directory = directory
+		self.getter = getter
+		self.expireperiod = expireperiod
+		self.debug = debug
+		
+		
+		if self.directory:
+			self.fileCacheEnabled = True
+			# create directory if it doesn't exist
+			if not os.path.exists(self.directory):
+				os.makedirs(self.directory)
+		else:
+			self.fileCacheEnabled = False
+		
+		# cache trackers
+		self.memoryCache = {}
+		self.fileCache = {}
+		
+		# load file cache index
+		self.loadFileCache()
+		
+	#
+	# file system cache
+	#
+	def getIndexFileName(self):
+		return os.path.join(self.directory, "%s.index" % self.name)
+	def getFileName(self, uuid):
+		return os.path.join(self.directory, "%s.%s" % (uuid,self.name))
+	def convertTime2String(self, dt):
+		return str(tuple(list(dt.timetuple())[:6]))
+	def convertString2Time(self, dt_raw):
+		dt = ast.literal_eval(dt_raw)
+		return datetime.datetime(*dt[:6])
+		
 
+	def loadFileCache(self):
+		if not self.fileCacheEnabled:
+			return
+
+		now = datetime.datetime.now()
+		self.fileCache = {}
+		indexfile = self.getIndexFileName()
+		
+		try:
+			index = codecs.open(indexfile, 'r', 'utf8').read()
+		except:
+			return
+		
+		for line in index.split('\n'):
+			if not line: continue
+			uuid, dt_raw = line.split('\t')
+			dt = self.convertString2Time(dt_raw)
+			if self.expireperiod and dt + self.expireperiod < now:
+				fname = self.getFileName(uuid)
+				self.debug("FileCache('%s')::loadFileCache: removed expired file %s"%(self.name,fname))
+				self.debug("FileCache('%s')::loadFileCache: condition: %s + %s < %s" % (self.name, dt, self.expireperiod, now))
+				try: 	os.remove(fname)
+				except:	pass
+			else:
+				self.fileCache[uuid] = dt_raw
+		
+		index = []
+		for uuid, dt_raw in self.fileCache.items():
+			index.append( "%s\t%s" % (uuid, dt_raw) )
+		codecs.open(indexfile, 'w', 'utf8').write('\n'.join(index))
+	
+	
+	def appendFileCache(self, uuid, content):
+		if not self.fileCacheEnabled:
+			return
+
+		fname = self.getFileName(uuid)
+		codecs.open(fname, 'w', 'utf8').write(content)
+		
+		indexfile = self.getIndexFileName()
+		now = datetime.datetime.now()
+		now_raw = self.convertTime2String(now)
+		appendindex = "\n%s\t%s" % (uuid, now_raw)
+		codecs.open(indexfile, 'a', 'utf8').write(appendindex)
+	
+	def readFileContent(self, uuid):
+		fname = self.getFileName(uuid)
+		return codecs.open(fname, 'r', 'utf8').read()
+	
+	#
+	# actual getter
+	#
+	def get(self, x):
+		uuid = hashlib.sha1(x).hexdigest()
+		
+		if uuid in self.memoryCache:
+			self.debug("FileCache('%s')::get('%s'): memory cache hit"%(self.name,x))
+			return self.memoryCache[uuid]
+		elif uuid in self.fileCache and self.fileCacheEnabled:
+			self.debug("FileCache('%s')::get('%s'): file cache hit"%(self.name,x))
+			content = self.readFileContent(uuid)
+			self.memoryCache[uuid] = content
+			return content
+		else:
+			self.debug("FileCache('%s')::get('%s'): total cache miss"%(self.name,x))
+			content = self.getter(x)
+			self.appendFileCache(uuid, content)
+			self.memoryCache[uuid] = content
+			return content
 
 #
 # CutList Class
@@ -308,38 +424,28 @@ class CutListAT:
 		self.opener = urllib2.build_opener()
 		self.opener.addheaders = [ ('User-agent', prog_id)]
 		self.cutoptions = cutoptions
-		self.CL_Cache = {}
-		self.CL_FC_Suffix = ".cutlist"
-		p = self.CL_FC_Suffix
-		self.CL_FileCache = [f[:-len(p)] for f in os.listdir(cutoptions.cachedir) if f.endswith(p)]\
-					if cutoptions.cachedir else []
-	
+		
+		self.cutlistCache = FileCache("cutlist", cutoptions.cachedir, self._GetCutList,
+								cutlist_expire_period, lambda x: Debug(2, x))
+		self.searchCache = FileCache("search", cutoptions.cachedir, self._GetSearchList,
+								search_request_expire_period, lambda x: Debug(2, x))
+
 	def Get(self, url):
 		return self.opener.open("http://www.cutlist.at/" + url).read()
 		
-	def ListAll(self, filename):
+	def _GetSearchList(self, filename):
 		url = "getxml.php?name=%s&version=0.9.8.0" % filename
-		xml = unicode(self.Get(url), "iso-8859-1")
+		return unicode(self.Get(url), "iso-8859-1")
+	def ListAll(self, filename):
+		xml = self.searchCache.get(filename)
 		cutlists = re.findall('<cutlist row_index="\\d">.*?</cutlist>', xml, re.DOTALL)		
 		return [CutList(self,cutlist) for cutlist in cutlists]
 	
+	def _GetCutList(self, cl_id):
+		url = "getfile.php?id=%s" % cl_id
+		return unicode(self.Get(url), "iso-8859-1")
 	def GetCutList(self, cl_id):
-		if cl_id not in self.CL_Cache:
-			Debug(2, "cutlist: cache miss: %s" % cl_id)
-			fname = self.cutoptions.cachedir + cl_id + self.CL_FC_Suffix
-			if cl_id in self.CL_FileCache:
-				Debug(2, "cutlist: found on disk: %s" % cl_id)
-				cutlist = codecs.open(fname, 'r', 'utf8').read()
-			else:
-				Debug(2, "cutlist: load from internet: %s" % cl_id)
-				url = "getfile.php?id=%s" % cl_id
-				cutlist = unicode(self.Get(url), "iso-8859-1")
-				# write cutlist on disk
-				codecs.open(fname, 'w', 'utf8').write(cutlist)
-			self.CL_Cache[cl_id] = cutlist
-		else:
-			Debug(2, "cutlist: cache hit: %s" % cl_id)
-		return self.CL_Cache[cl_id]
+		return self.cutlistCache.get(cl_id)
 	
 	def RateCutList(self, cl_id, rating):
 		Debug(2, "rate cutlist %s with %d" % (cl_id, rating))

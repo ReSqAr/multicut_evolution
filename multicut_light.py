@@ -203,9 +203,12 @@ class CutList:
 		else:
 			errorline = ""
 		
-		outtxt =  "%s\n" % self.attr["metarating"]\
-		+ "@RED %s @CLEAR	Schnitte:  @BLUE %s @CLEAR (%s)	Spielzeit: @BLUE %s @CLEAR (hh:mm:ss)\n" % (number, cuts, cutsformat, duration) \
-		+ "	Bewertung: @BLUE %s (%s/%s) @CLEAR    	Autor:     @BLUE %s (%s) @CLEAR\n" % (rating, self.attr["ratingcount"], self.attr["downloadcount"], author, self.attr["ratingbyauthor"])\
+		outtxt =  \
+		  "@RED %s @CLEAR	Schnitte:  @BLUE %s @CLEAR (%s)	Spielzeit: @BLUE %s @CLEAR (hh:mm:ss)\n" % \
+													(number, cuts, cutsformat, duration) \
+		+ "%s	Bewertung: @BLUE %s (%s/%s) @CLEAR    	Autor:     @BLUE %s (%s) @CLEAR\n" \
+				% (self.attr["metarating"], rating, self.attr["ratingcount"], self.attr["downloadcount"], 
+																			author, self.attr["ratingbyauthor"])\
 		+ errorline
 		if self.attr["usercomment"]:
 			outtxt += "	Kommentar: @BLUE %s @CLEAR\n" % self.attr["usercomment"]
@@ -768,6 +771,9 @@ def main():
 			c = CutFile(avi, o)
 			if c.ChooseCutList():
 				cutfiles[avi] = c
+			else:
+				if avi in cutfiles:
+					del cutfiles[avi]
 		print
 		print
 		print "Cutlists umwählen:"
@@ -777,7 +783,7 @@ def main():
 			cut = 'x' if avi in cutfiles else ' '
 			print "[%2d] %s %s" % (i+1,cut,aviname)
 		print "[ a] alle neu wählen"
-		print "[ n] oder leere Eingabe: nichts neu wählen"
+		print "[ n] oder leere Eingabe: nichts neu wählen und anfangen zu schneiden"
 		
 		avis2Choose = None
 		while True:
@@ -811,7 +817,7 @@ def main():
 	###
 	print
 	print
-	print "Schneide %d Datei(en)" % len(cutfiles)
+	print "Schneide %d Datei(en):" % len(cutfiles)
 
 	checkfiles = []
 	errors = []
@@ -831,8 +837,8 @@ def main():
 		if errors:
 			for e,c in errors:
 				print 70*'#'
-				print e
 				print c.filename
+				print e
 	except:
 		print "Fehler während dem Anzeigen von Fehlern..."
 		
@@ -842,12 +848,55 @@ def main():
 		###
 		print
 		print
-		print "Zeige %d Datei(en)" % len(checkfiles)
-
-		for i,c in enumerate(checkfiles):
+		while checkfiles:
 			print
-			print "%d von %d" % (i+1, len(checkfiles))
-			c.ShowCut()
+			print
+			print "Schnitte überprüfen von %d Datei(en):" % len(checkfiles)
+			
+			for i,c in enumerate(checkfiles):
+				aviname = c.filename
+				print "[%2d] %s" % (i+1,aviname)
+			print "[ n] keine prüfen und beenden"
+			print "[ a] oder leere Eingabe: alle überprüfen"
+			
+			avis2Check = None
+			while True:
+				sys.stdout.write("Auswahl(1,1-3,1-2-9): ")
+				sys.stdout.flush()
+				s = sys.stdin.readline().strip()
+				if not s or 'a' in s:
+					avis2Check = checkfiles[:] #copy
+					break
+				elif 'n' in s:
+					break
+				else:
+					try:
+						iis = ParseIIRange(s)
+						iis = sorted(list(set(iis)))
+						iis = [i-1 for i in iis]
+						if not (0 <= min(iis) and max(iis) < len(checkfiles)):
+							print "%sIhre Eingabe ist fehlerhaft, versuchen Sie es erneut.%s" %(C_RED,C_CLEAR)
+							continue
+						avis2Check = [checkfiles[i] for i in iis]
+						break
+					except:
+						print "%sEin Fehler ist aufgetreten, versuchen Sie es erneut.%s" %(C_RED,C_CLEAR)
+						continue
+			
+			if not avis2Check:
+				break
+			
+			print avis2Check
+			
+			for i,c in enumerate(avis2Check):
+				print
+				print "%d von %d" % (i+1, len(avis2Check))
+				c.ShowCut()
+				try:	checkfiles.remove(c)
+				except: pass
+	
+
+
 
 
 if __name__ == '__main__':

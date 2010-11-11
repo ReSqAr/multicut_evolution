@@ -39,6 +39,7 @@ Die übergebenden Dateien werden geschnitten. Optionen:
 	--config $name
 		Gibt den Namen der zu verwendenden Konfigurationsdatei an.
 		[default: ~/.multicut_light.conf]
+	
 	--verbosity $d
 		Debuginformationen werden entsprechend ausgegeben.
 		[default: 0, maximal 5]
@@ -60,6 +61,8 @@ In der Konfigurationsdatei zur Verfügung stehenden Einstellungen:
 		Ausdruck für Ausgabename (s.u.) [default: {base}-cut{rating}.{ext}]
 	uncutname=
 		Ausdruck für Ausgabename (s.u.) [default: {full}]
+	bewerten=
+		Gibt an, ob nach einer Wertung gefragt werden soll. [default:1]
 
 Beschreibung der Sprache für die Namensgebung:
 {base}		Dateiname ohne Endung
@@ -361,6 +364,8 @@ class CutOptions:
 
 		self.time_before_cut = 10
 		self.time_after_cut  = 5
+		
+		self.do_rate = 1
 
 		if configfile: # parse
 			print "Parse Konfigurationsdatei: %s" % configfile
@@ -439,6 +444,8 @@ class CutOptions:
 						self.time_before_cut = int(opt)
 					elif line.startswith("nachlauf"):
 						self.time_after_cut  = int(opt)
+					elif line.startswith("bewerten"):
+						self.do_rate = int(opt)
 				except StandardError, e:
 					print "ConfigParse: Could not parse '%s' due to:" % line
 					print e
@@ -564,7 +571,8 @@ class CutFile:
 		inp = sys.stdin.readline().strip()
 		if inp != 'n':
 			self.cutlist.ShowCuts(self.cutpath, is_filecut = True, tempdir = self.cutoptions.tempdir)		
-			self.cutlist.Rate()
+			if self.cutoptions.do_rate:
+				self.cutlist.Rate()
 
 		sys.stdout.write("Annehmen? [J/n]: ")
 		sys.stdout.flush()

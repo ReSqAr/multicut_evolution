@@ -271,9 +271,6 @@ class CutList:
 			
 		Run("mplayer", ["-edl", edlfile, "-sub", subfile, "-osdlevel", "3", path])
 		
-		if is_filecut:
-			self.Rate()
-	
 	def Rate(self):
 		text =  "\n@RED Bitte eine Bewertung für die Cutlist abgeben... @CLEAR\n"
 		text += "[0] Dummy oder keine Cutlist\n"
@@ -567,7 +564,23 @@ class CutFile:
 		inp = sys.stdin.readline().strip()
 		if inp != 'n':
 			self.cutlist.ShowCuts(self.cutpath, is_filecut = True, tempdir = self.cutoptions.tempdir)		
+			self.cutlist.Rate()
+
+		sys.stdout.write("Annehmen? [J/n]: ")
+		sys.stdout.flush()
+		s = sys.stdin.readline().strip()
+		if 'n' in s.lower():
+			sys.stdout.write("Sind Sie sicher, dass die geschnitte Datei gelöscht werden soll? [J/n]")
+			sys.stdout.flush()
+			s = sys.stdin.readline().strip()
+			if not 'n' in s.lower():
+				print "%s Lösche %s %s" % (C_RED, self.cutpath, C_CLEAR)
+				os.remove(self.cutpath)
+				os.rename(self.uncutpath, self.path)
+					
 	
+
+			
 	def GetAspect(self):
 		out = Run("mplayer",  ["-vo", "null", "-nosound", "-frames", "1", self.path])[0]
 		if "Movie-Aspect is 1.33:1" in out or "Film-Aspekt ist 1.33:1" in out:

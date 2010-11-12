@@ -989,22 +989,27 @@ def main():
 			print "Schnitte überprüfen von %d Datei(en):" % len(checkfiles)
 			
 			checkfiles.sort( key = lambda (_,n): n )
+			filesNeedCheck = [ c_n for c_n in checkfiles if c_n[1] == 0 ]
 			
 			for i,(c,n) in enumerate(checkfiles):
 				aviname = c.filename
 				checked = "x" if n > 0 else " "
 				print "[%2d] %s %s" % (i+1,checked,aviname)
-			print "[ n] keine prüfen und beenden"
-			print "[ f] alle überprüfen"
-			print "[ a] oder leere Eingabe: alle noch nicht überprüften überprüfen"
-			
+			if filesNeedCheck:
+				print "[ n] keine prüfen und beenden"
+				print "[ f] alle überprüfen"
+				print "[ a] oder leere Eingabe: alle noch nicht überprüften überprüfen"
+			else:
+				print "[ f] alle überprüfen"
+				print "[ a] beenden"
+				
 			avis2Check = None
 			while True:
 				sys.stdout.write("Auswahl(1,1-3,1-2-9): ")
 				sys.stdout.flush()
 				s = sys.stdin.readline().strip()
 				if not s or 'a' in s:
-					avis2Check = [ c_n for c_n in checkfiles if c_n[1] == 0]
+					avis2Check = filesNeedCheck if filesNeedCheck else None
 					break
 				elif 'f' in s:
 					avis2Check = checkfiles

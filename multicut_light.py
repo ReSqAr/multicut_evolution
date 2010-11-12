@@ -980,16 +980,23 @@ def main():
 		###
 		print
 		print
+		
+		checkfiles = [ [f,0] for f in checkfiles ]
+		
 		while checkfiles:
 			print
 			print
 			print "Schnitte überprüfen von %d Datei(en):" % len(checkfiles)
 			
-			for i,c in enumerate(checkfiles):
+			checkfiles.sort( key = lambda (_,n): n )
+			
+			for i,(c,n) in enumerate(checkfiles):
 				aviname = c.filename
-				print "[%2d] %s" % (i+1,aviname)
+				checked = "x" if n > 0 else " "
+				print "[%2d] %s %s" % (i+1,checked,aviname)
 			print "[ n] keine prüfen und beenden"
-			print "[ a] oder leere Eingabe: alle überprüfen"
+			print "[ f] alle überprüfen"
+			print "[ a] oder leere Eingabe: alle noch nicht überprüften überprüfen"
 			
 			avis2Check = None
 			while True:
@@ -997,9 +1004,13 @@ def main():
 				sys.stdout.flush()
 				s = sys.stdin.readline().strip()
 				if not s or 'a' in s:
-					avis2Check = checkfiles[:] #copy
+					avis2Check = [ c_n for c_n in checkfiles if c_n[1] == 0]
+					break
+				elif 'f' in s:
+					avis2Check = checkfiles
 					break
 				elif 'n' in s:
+					avis2Check = None
 					break
 				else:
 					try:
@@ -1015,16 +1026,14 @@ def main():
 						print "%sEin Fehler ist aufgetreten, versuchen Sie es erneut.%s" %(C_RED,C_CLEAR)
 						continue
 			
-			if not avis2Check:
+			if avis2Check == None:
 				break
 
-			for i,c in enumerate(avis2Check):
+			for i,c_n in enumerate(avis2Check):
 				print
 				print "%d von %d" % (i+1, len(avis2Check))
-				c.ShowCut()
-				try:	checkfiles.remove(c)
-				except: pass
-	
+				c_n[0].ShowCut()	
+				c_n[1] += 1
 
 
 

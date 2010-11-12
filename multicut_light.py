@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import subprocess
-import os, shutil
+import os, shutil, codecs
 import time
 import random
 import tempfile
 import urllib2
-import codecs
 import re
 import sys
 import datetime
@@ -528,29 +527,33 @@ class CutOptions:
 		
 	def ParseConfig(self, config):
 		config = os.path.expanduser(config)
-		Debug(1, "open config %s" % config)
+		Debug(1, "CutOptions::ParseConfig: open config '%s'" % config)
 		try:
 			for line in open(config):
+				if not line.strip():
+					continue
 				try:
-					opt = line.split("=",1)[1].strip()
-					if line.startswith("cutdir"):
+					cmd, opt = line.split("=",1)
+					cmd, opt = cmd.strip(), opt.strip()
+					Debug(2, "CutOptions::ParseConfig: config read:'%s' = '%s'" % (cmd,opt))
+					if cmd == "cutdir":
 						self.cutdir  = os.path.expanduser(opt)
-					elif line.startswith("uncutdir"):
+					elif cmd == "uncutdir":
 						self.uncutdir= os.path.expanduser(opt)
-					elif line.startswith("virtualdub"):
+					elif cmd == "virtualdub":
 						self.cmd_VirtualDub = os.path.expanduser(opt)
-					elif line.startswith("cachedir"):
+					elif cmd == "cachedir":
 						self.cachedir= os.path.expanduser(opt)
 
-					elif line.startswith("cutname"):
+					elif cmd == "cutname":
 						self.cutnameformat = opt
-					elif line.startswith("uncutname"):
+					elif cmd == "uncutname":
 						self.uncutnameformat = opt
-					elif line.startswith("vorlauf"):
+					elif cmd == "vorlauf":
 						self.time_before_cut = int(opt)
-					elif line.startswith("nachlauf"):
+					elif cmd == "nachlauf":
 						self.time_after_cut  = int(opt)
-					elif line.startswith("bewerten"):
+					elif cmd == "bewerten":
 						self.do_rate = int(opt)
 				except StandardError, e:
 					print "ConfigParse: Could not parse '%s' due to:" % line
@@ -692,9 +695,6 @@ class CutFile:
 				os.remove(self.cutpath)
 				shutil.move(self.uncutpath, self.path)
 					
-	
-
-			
 	def GetAspect(self):
 		out = Run("mplayer",  ["-vo", "null", "-nosound", "-frames", "1", self.path])[0]
 		if "Movie-Aspect is 1.33:1" in out or "Film-Aspekt ist 1.33:1" in out:

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import subprocess
-import os
+import os, shutil
 import time
 import random
 import tempfile
@@ -664,8 +664,8 @@ class CutFile:
 		print "Fertig, benötigte Zeit: %ds" % int(end-start)
 			
 		if os.path.isfile(self.tmppath):
-			os.rename(self.path, self.uncutpath)
-			os.rename(self.tmppath, self.cutpath)
+			shutil.move(self.path, self.uncutpath)
+			shutil.move(self.tmppath, self.cutpath)
 			return True
 		else:
 			print "Schneiden war nicht erfolgreich"
@@ -690,7 +690,7 @@ class CutFile:
 			if not 'n' in s.lower():
 				print "%s Lösche %s %s" % (C_RED, self.cutpath, C_CLEAR)
 				os.remove(self.cutpath)
-				os.rename(self.uncutpath, self.path)
+				shutil.move(self.uncutpath, self.path)
 					
 	
 

@@ -692,7 +692,8 @@ class CutFile:
 			s = sys.stdin.readline().strip()
 			if not 'n' in s.lower():
 				print "%s Lösche %s %s" % (C_RED, self.cutpath, C_CLEAR)
-				os.remove(self.cutpath)
+				try:	os.remove(self.cutpath)
+				except: pass # doesn't matter
 				shutil.move(self.uncutpath, self.path)
 					
 	def GetAspect(self):

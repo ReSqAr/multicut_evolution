@@ -20,15 +20,15 @@ C_RED   = "\033[41;37;1m"
 C_BLUE  = "\033[44;37;1m"
 
 
-multicut_light_date = "11.11.2010"
-prog_id = "multicut_light.py/%s" % multicut_light_date
+multicut_evolution_date = "11.11.2010"
+prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
 prog_help = \
 """
-Hilfe für multicut_light.py (%s):
+Hilfe für multicut_evolution.py (%s):
 
-multicut_light.py [--help] [--nocheck] [--verbosity $d] [--config $name] $file1 ...
+multicut_evolution.py [--help] [--nocheck] [--verbosity $d] [--config $name] $file1 ...
 
 Die übergebenden Dateien werden geschnitten. Optionen:
 	--help
@@ -40,7 +40,7 @@ Die übergebenden Dateien werden geschnitten. Optionen:
 
 	--config $name
 		Gibt den Namen der zu verwendenden Konfigurationsdatei an.
-		[default: ~/.multicut_light.conf]
+		[default: ~/.multicut_evolution.conf]
 	
 	--verbosity $d
 		Debuginformationen werden entsprechend ausgegeben.
@@ -79,7 +79,7 @@ Hinweise zur Nutzerinteraktion während der Ausführung:
 $n:		Wählt die Cutlist $n
 test $n:	Zeigt die Schnitte der Cutlist $n an
 Nichts:		Überspringt die Datei
-""" % multicut_light_date
+""" % multicut_evolution_date
 
 
 
@@ -457,10 +457,10 @@ class CutListAT:
 class CutOptions:
 	def __init__(self, class_cutlistprov, configfile = None):
 		# init values
-		self.tempdir = tempfile.mkdtemp(prefix = "multicut")
+		self.tempdir = tempfile.mkdtemp(prefix = "multicut_evolution")
 		self.cutdir  = os.getcwd()
 		self.uncutdir= os.getcwd()
-		self.cachedir= os.path.expanduser("~/.cache/mutlicut/")
+		self.cachedir= os.path.expanduser("~/.cache/multicut_evolution/")
 
 		self.cmd_VirtualDub = None
 
@@ -859,7 +859,7 @@ def main():
 		sys.exit(2)
 	
 	check_cut_files = True
-	configfile = "~/.multicut_light.conf"
+	configfile = "~/.multicut_evolution.conf"
 
 	for o, a in opts:
 		if o in ("-h", "--help"):

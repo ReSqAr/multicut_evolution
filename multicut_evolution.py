@@ -1,6 +1,24 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+    multicut_evolution -- Eine erweiterte Pythonversion von multicut_light.
+    Copyright (C) 2010  Yasin Zähringer
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
 import subprocess
 import os, shutil, codecs
 import time
@@ -20,8 +38,8 @@ C_RED   = "\033[41;37;1m"
 C_BLUE  = "\033[44;37;1m"
 
 
-multicut_evolution_date = "11.11.2010"
-prog_id = "multicut_evolution/%s" % multicut_evolution_date
+multicut_evolution_date = "14.11.2010"
+prog_id = "multicut_evolution.py/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
 prog_help = \
@@ -30,7 +48,39 @@ Hilfe für multicut_evolution.py (%s):
 
 multicut_evolution.py [--help] [--nocheck] [--verbosity $d] [--config $name] $file1 ...
 
-Die übergebenden Dateien werden geschnitten. Optionen:
+Die übergebenden Dateien werden anhand von auswählbaren Cutlists geschnitten.
+Dies geschieht in mehreren Phasen:
+
+Phase 1 - Auswahl der Cutlist
+	Für jede angegebene Datei wird eine Cutlistübersichtsseite angegeben. Daraus
+	kann man eine Cutlist auswählen, in dem man die Nummer eintippt und mit
+	Enter bestätigt und testen, indem man 'test $d' (wobei $d die Nummer der 
+	Cutlist ist) eintippt und mit Enter bestätigt. Einfach ohne Eingabe Enter
+	drücken, bewirkt, dass keine Cutlist ausgewählt wird.
+	Nachdem für alle Filme eine Cutlist ausgewählt wurde, hat man die Option
+	einzelne Cutlists umzuwählen oder alle zu bestätigen. Bestätigen
+	funktioniert einfach durch Enter drücken. Das Umwählen von Cutlists wird
+	durch Eingeben der zu den Filmen gehörenden Nummern ausgelöst. Dabei sind
+	Eingaben wie '1', '2-5' und '1,2-5' zulässig.
+
+Phase 2 - Schneiden
+	In dieser Phase ist keine Benutzerinteraktion notwendig.
+
+Phase 3 - Überprüfen der Schnitte
+	Nun können die Filme ausgewählt werden, die überprüft werden sollen. Dabei
+	können gewisse Filme angegeben durch ihre Nummer oder man überprüft alle
+	noch nicht überprüften Filme durch Eingabe von 'a'. Alternativ kann man alle
+	Filme überprüfen (auch die, die schon überprüft wurden) durch Eingabe von 
+	'f'. Desweiteren kann man das Programm durch 'n' beenden.
+	
+	Das Überprüfen untergliedert sich weiter, zu erst werden die Schnitte 
+	angezeigt, danach kann man die Cutlist bewerten mit Noten von 0 - 5. Seien
+	Sie fair! Danach kann man angegeben, ob die geschnitte Datei gelöscht werden
+	soll, was z.B. nach Fehlschnitten hilfreich ist. Dabei wird die 
+	Originaldatei an ihren ursprünglichen Ort zurückverschoben.
+
+
+Optionen:
 	--help
 		Zeigt dise Hilfe an
 
@@ -46,7 +96,8 @@ Die übergebenden Dateien werden geschnitten. Optionen:
 		Debuginformationen werden entsprechend ausgegeben.
 		[default: 0, maximal 5]
 
-In der Konfigurationsdatei zur Verfügung stehenden Einstellungen:
+In der Konfigurationsdatei zur Verfügung stehenden Einstellungen (der 
+Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
 	cutdir= 
 		Ausgabepfad [default: .]
 	uncutdir=
@@ -60,12 +111,13 @@ In der Konfigurationsdatei zur Verfügung stehenden Einstellungen:
 		Vorlauf bei der Überprüfung [default: 10]
 	nachlauf=
 		Nachlauf bei der Überprüfung [default: 5]
+	bewerten=
+		Gibt an, ob nach einer Wertung gefragt werden soll. [default:1]
 	cutname=
 		Ausdruck für Ausgabename (s.u.) [default: {base}-cut{rating}.{ext}]
 	uncutname=
 		Ausdruck für Ausgabename (s.u.) [default: {full}]
-	bewerten=
-		Gibt an, ob nach einer Wertung gefragt werden soll. [default:1]
+
 
 Beschreibung der Sprache für die Namensgebung:
 {base}		Dateiname ohne Endung
@@ -73,14 +125,13 @@ Beschreibung der Sprache für die Namensgebung:
 {shortext}	Dateiendung ohne mpg.
 {rating}	Bewertung der Cutlist *100
 {full}		Der gesamte Dateiname
-
-Hinweise zur Nutzerinteraktion während der Ausführung:
-"Auswahl/Test:" akzeptiert drei Kommandos:
-$n:		Wählt die Cutlist $n
-test $n:	Zeigt die Schnitte der Cutlist $n an
-Nichts:		Überspringt die Datei
 """ % multicut_evolution_date
 
+
+print "multicut_light  Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
+print "(URL: https://yhjz.de/public/gitweb/gitweb.cgi?p=multicut_evolution.git)"
+print "This program comes with ABSOLUTELY NO WARRANTY."
+print
 
 
 avidemux_cmds = ["avidemux2_cli", "avidemux_cli", "avidemux2", "avidemux", 

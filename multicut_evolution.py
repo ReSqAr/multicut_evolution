@@ -3,7 +3,7 @@
 
 """
     multicut_evolution -- Eine erweiterte Pythonversion von multicut_light.
-    Copyright (C) 2010  Yasin Zähringer
+    Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
 import subprocess
@@ -33,10 +33,10 @@ import hashlib
 import ast
 
 
-C_CLEAR = "\033[0m"
-C_RED   = "\033[41;37;1m"
-C_BLUE  = "\033[44;37;1m"
-
+C_CLEAR			= "\033[0m"
+C_RED			= "\033[41;37;1m"
+C_BLUE			= "\033[44;37;1m"
+C_RED_UNDERLINE	= "\033[41;37;1;4m"
 
 multicut_evolution_date = "14.11.2010"
 prog_id = "multicut_evolution.py/%s" % multicut_evolution_date
@@ -74,10 +74,11 @@ Phase 3 - Überprüfen der Schnitte
 	'f'. Desweiteren kann man das Programm durch 'n' beenden.
 	
 	Das Überprüfen untergliedert sich weiter, zu erst werden die Schnitte 
-	angezeigt, danach kann man die Cutlist bewerten mit Noten von 0 - 5. Seien
-	Sie fair! Danach kann man angegeben, ob die geschnitte Datei gelöscht werden
-	soll, was z.B. nach Fehlschnitten hilfreich ist. Dabei wird die 
-	Originaldatei an ihren ursprünglichen Ort zurückverschoben.
+	angezeigt, danach kann man die Cutlist bewerten mit Noten zwischen 0 - 5. 
+	(0 = schlechteste, 5 = beste Bewertung) Seien Sie fair! Danach kann man
+	angegeben, ob die geschnitte Datei gelöscht werden soll, was z.B. nach 
+	Fehlschnitten hilfreich ist. Dabei wird die Originaldatei an ihren 
+	ursprünglichen Ort zurückverschoben.
 
 
 Optionen:
@@ -120,11 +121,11 @@ Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
 
 
 Beschreibung der Sprache für die Namensgebung:
-{base}		Dateiname ohne Endung
-{ext}		Dateiendung
-{shortext}	Dateiendung ohne mpg.
-{rating}	Bewertung der Cutlist *100
-{full}		Der gesamte Dateiname
+	{base}		Dateiname ohne Endung
+	{ext}		Dateiendung
+	{shortext}	Dateiendung ohne mpg.
+	{rating}	Bewertung der Cutlist *100
+	{full}		Der gesamte Dateiname
 """ % multicut_evolution_date
 
 
@@ -134,8 +135,10 @@ print "This program comes with ABSOLUTELY NO WARRANTY."
 print
 
 
-avidemux_cmds = ["avidemux2_cli", "avidemux_cli", "avidemux2", "avidemux", 
-						"avidemux2_gtk", "avidemux_gtk", "avidemux2_qt4", "avidemux_qt4"]
+avidemux_cmds = ["avidemux2_cli", "avidemux_cli",
+					"avidemux2", "avidemux", 
+					"avidemux2_gtk", "avidemux_gtk",
+					"avidemux2_qt4", "avidemux_qt4"]
 
 search_request_expire_period = datetime.timedelta(hours=2)
 cutlist_expire_period = datetime.timedelta(days=14)
@@ -949,8 +952,20 @@ def main():
 	avis.sort()
 	avis2Choose = avis
 	cutfiles = {}
+	
+	print
+	print
+	print "%s Cutlists auswählen für insgesamt %d Datei(en): %s" %(C_RED_UNDERLINE, len(avis), C_CLEAR)
+	print
+	print
+	
 	while avis2Choose:
 		# choose
+		print
+		print
+		print "%s Cutlists auswählen für %d Datei(en): %s" %(C_RED, len(avis2Choose), C_CLEAR)
+		print
+		
 		for avi in avis2Choose:
 			c = CutFile(avi, o)
 			if c.ChooseCutList():
@@ -960,7 +975,8 @@ def main():
 					del cutfiles[avi]
 		print
 		print
-		print "Cutlists umwählen:"
+		print "%s Cutlists umwählen: %s" %(C_RED, C_CLEAR)
+		print
 		# confirm selection
 		for i,avi in enumerate(avis):
 			aviname = os.path.basename(avi)
@@ -1001,7 +1017,9 @@ def main():
 	###
 	print
 	print
-	print "Schneide %d Datei(en):" % len(cutfiles)
+	print "%s Schneide %d Datei(en): %s" %(C_RED_UNDERLINE, len(cutfiles), C_CLEAR)
+	print
+	print
 
 	checkfiles = []
 	errors = []
@@ -1034,11 +1052,18 @@ def main():
 		print
 		
 		checkfiles = [ [f,0] for f in checkfiles ]
+
+		print
+		print
+		print "%s Schnitte überprüfbar von insgesamt %d Datei(en): %s" %(C_RED_UNDERLINE, len(checkfiles), C_CLEAR)
+		print
+		print
 		
 		while checkfiles:
 			print
 			print
-			print "Schnitte überprüfen von %d Datei(en):" % len(checkfiles)
+			print "%s Schnitte überprüfen von %d Datei(en): %s" %(C_RED, len(checkfiles), C_CLEAR)
+			print
 			
 			checkfiles.sort( key = lambda (_,n): n )
 			filesNeedCheck = [ c_n for c_n in checkfiles if c_n[1] == 0 ]
@@ -1087,6 +1112,7 @@ def main():
 				break
 
 			for i,c_n in enumerate(avis2Check):
+				print
 				print
 				print "%d von %d" % (i+1, len(avis2Check))
 				c_n[0].ShowCut()	

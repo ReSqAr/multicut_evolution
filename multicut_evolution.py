@@ -120,7 +120,8 @@ Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
 		Ausdruck für Ausgabename (s.u.) [default: {full}]
 
 
-Beschreibung der Sprache für die Namensgebung:
+Beschreibung der Sprache für die Namensgebung von Dateien:
+(siehe auch cutname=, uncutname=)
 	{base}		Dateiname ohne Endung
 	{ext}		Dateiendung
 	{shortext}	Dateiendung ohne mpg.

@@ -527,7 +527,8 @@ class CutOptions:
 		
 		self.do_rate = 1
 
-		if configfile: # parse
+		# parse
+		if configfile:
 			print "Parse Konfigurationsdatei: %s" % configfile
 			self.ParseConfig(configfile)
 
@@ -562,14 +563,14 @@ class CutOptions:
 		else:
 			raise RuntimeError("avidemux not found")
 		
-		print "Using as temp directory: %s" % self.tempdir
-		print "Using as cut directory: %s" % self.cutdir
-		print "Using as uncut directory: %s" % self.uncutdir
-		print "Using as cache directory: %s" % self.cachedir
-		print "Using as cutnameformat: %s" % self.cutnameformat
-		print "Using as uncutnameformat: %s" % self.uncutnameformat
-		print "Using as AviDemux: %s (v:%s)" % (self.cmd_AviDemux, self.cmd_AviDemux_version)
-		print "Using as VirtualDub: %s" % self.cmd_VirtualDub
+		print "Benutze als temp-Verzeichnis: %s" % self.tempdir
+		print "Benutze als cut-Verzeichnis: %s" % self.cutdir
+		print "Benutze als uncut-Verzeichnis: %s" % self.uncutdir
+		print "Benutze als cache-Verzeichnis: %s" % self.cachedir
+		print "Benutze als cutnameformat: %s" % self.cutnameformat
+		print "Benutze als uncutnameformat: %s" % self.uncutnameformat
+		print "Benutze als AviDemux: %s (v:%s)" % (self.cmd_AviDemux, self.cmd_AviDemux_version)
+		print "Benutze als VirtualDub: %s" % self.cmd_VirtualDub
 		
 		self.cutlistprov = class_cutlistprov(self) #init prov
 
@@ -945,7 +946,7 @@ def main():
 	avis = []
 	for avi in args:
 		if not avi.endswith(".avi"):
-			print "Non-Avi file omitted: %s" % avi
+			print "Non-Avi Datei ausgelassen: %s" % avi
 			continue
 		else:
 			avis.append(avi)

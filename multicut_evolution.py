@@ -542,7 +542,10 @@ class CutListGenerator:
 		#
 		print "%s Starte Avidemux. Das Projekt muss manuell gespeichert werden. %s" % (C_RED, C_CLEAR)
 		#$avidemux --nogui --force-smart --run "$avidemux_project" --save-workbench "$avidemux_project" # 1>/dev/null 2>/dev/null
-		out, err = Run(self.cutlistprov.cutoptions.cmd_AviDemux_Gui, ["--force-smart", "--run", self.tmppath, "--save-workbench", self.tmppath])
+		cmdoptions = ["--force-smart", "--run", self.tmppath]
+		if self.cutlistprov.cutoptions.aviDemux_saveWorkbench:
+			cmdoptions += ["--save-workbench", self.tmppath]
+		out, err = Run(self.cutlistprov.cutoptions.cmd_AviDemux_Gui, cmdoptions)
 		
 		#
 		# post processing
@@ -643,6 +646,7 @@ class CutOptions:
 
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
+		self.aviDemux_saveWorkbench = True
 		
 		self.cutnameformat = "{base}-cut{rating}.{ext}"
 		self.uncutnameformat = "{full}"
@@ -726,6 +730,8 @@ class CutOptions:
 						self.cmd_VirtualDub = os.path.expanduser(opt)
 					elif cmd == 'avidemux_gui':
 						self.cmd_AviDemux_Gui = os.path.expanduser(opt)
+					elif cmd == 'avidemux_saveworkbench':
+						self.aviDemux_saveWorkbench = (opt=='True' or opt=='1')
 					elif cmd == "cachedir":
 						self.cachedir= os.path.expanduser(opt)
 

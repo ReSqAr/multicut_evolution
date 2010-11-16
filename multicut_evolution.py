@@ -506,6 +506,89 @@ class CutListAT:
 		url = "rate.php?rate=%s&rating=%d" % (cl_id, rating)
 		return self.Get(url)
 
+class CutListOwnProvider:
+	def __init__(self, cutoptions):
+		self.cutoptions = cutoptions
+	def makeCutList(self, filename):
+		self.filename = filename
+		self.basename = os.path.basename(filename)
+		self.tmpname = 'project.js'
+		self.tmppath = self.cutoptions.tempdir + self.tmpname
+		self.cutlistfile = self.cutoptions.tempdir+self.basename+'.cutlist'
+		self.writeAvidemuxProject()
+		print "starting avidemux. Don't forget to save the project"
+		#$avidemux --nogui --force-smart --run "$avidemux_project" --save-workbench "$avidemux_project" # 1>/dev/null 2>/dev/null
+		out, err = Run('avidemux2_qt4', ["--force-smart", "--run", self.tmppath])#, "--save-workbench", self.tmppath])
+		#Todo: Care about return?
+		project = open(self.tmppath, 'r').read()
+		if not "app.addSegment" in project:
+			print "No cuts added!"
+			return None
+		self.numberOfCuts = len(project.split("app.addSegment"))-1
+		if "app.video.fps1000" in project:
+			grapFPS = project.split("app.video.fps1000")[1].split('=')[1].split(';')[0].strip()
+		else:
+			grapFPS = project.split("app.video.setFps1000")[1].split('(')[1].split(')')[0].strip()
+		self.FPS = float(grapFPS)*0.001
+		self.rating = 5 #TODO
+		self.infos = 1 #TODO
+		self.writeCutListHeader()
+		cut = 0
+		for segment in project.split("app.addSegment(0")[1:]:
+			self.writeCutListSegment(segment, cut)
+			cut += 1
+		idstr = '<rating></rating><ratingbyauthor></ratingbyauthor>\n'\
+			+ '<ratingcount></ratingcount>\n'\
+			+ '<downloadcount></downloadcount>\n'\
+			+ '<id>%s</id>' %self.cutlistfile
+		return CutList(self,idstr)
+	def writeCutListHeader(self):
+		str = '[General]\n'\
+			+ 'Application=cutlist.sh\n'\
+			+ 'Version=$Stand\n'\
+			+ 'comment1=Diese Cutlist unterliegt den Nutzungsbedingungen von cutlist.at (Stand: 14.Oktober 2008)\n'\
+			+ 'comment2=http://cutlist.at/terms/'\
+			+ 'ApplyToFile=%s' % self.basename\
+			+ 'OriginalFileSizeBytes=%s\n' % os.path.getsize(self.filename)\
+			+ 'FramesPerSecond=%s\n' % self.FPS\
+			+ 'IntendedCutApplication=Avidemux\n'\
+			+ 'IntendedCutApplicationVersion=2.3.0\n'\
+			+ 'IntendedCutApplicationOptions=\n'\
+			+ 'CutCommandLine=\n'\
+			+ 'NoOfCuts=%s\n' % self.numberOfCuts\
+			+ '[Info]\n'\
+			+ 'Author=%s\n' % "jemand"\
+			+ 'RatingByAuthor=%s\n' % self.rating\
+			+ 'EPGError=%s\n' % ""\
+			+ 'ActualContent=%s\n' % ""\
+			+ 'MissingBeginning=%s\n' % ""\
+			+ 'MissingEnding=%s\n' % ""\
+			+ 'MissingAudio=%s\n' % ""\
+			+ 'MissingVideo=%s\n' % ""\
+			+ 'OtherError=%s\n' % ""\
+			+ 'OtherErrorDescription=%s\n' % ""\
+			+ 'SuggestedMovieName=%s\n' % ""\
+			+ 'UserComment=%s\n' % ""
+		open(self.cutlistfile, "w").write(str)
+	def writeCutListSegment(self, segment, cut):
+		start=segment.split(',')[1]
+		duration=segment.split(',')[2].split(')')[0]
+		str = '[Cut%s]\n' % cut\
+			+ 'Start=%f\n' % (float(start)/self.FPS) \
+			+ 'StartFrame=%s\n' %start\
+			+ 'Duration=%f\n' % (float(duration)/self.FPS) \
+			+ 'DurationFrames=%s\n\n' % duration
+		open(self.cutlistfile, "a").write(str)
+	def writeAvidemuxProject(self):
+		str = '//AD\n'\
+			+ 'var app = new Avidemux();\n'\
+			+ 'app.load("%s");\n' % self.filename
+		#TODO: Some strange nextfilethings for merging
+		self.Write(str)
+	def Write(self, text, mode = "a"):
+		open(self.tmppath, mode).write(text)
+	def GetCutList(self, cl_id):
+		return open(cl_id).read()
 #
 # CutOptions Class
 #
@@ -573,6 +656,7 @@ class CutOptions:
 		print "Benutze als VirtualDub: %s" % self.cmd_VirtualDub
 		
 		self.cutlistprov = class_cutlistprov(self) #init prov
+		self.owncutlistprov = CutListOwnProvider(self)
 
 		self.DefaultProjectClass = AviDemuxProjectClass
 		self.RegisteredProjectClasses = {}
@@ -655,8 +739,9 @@ class CutFile:
 		print "%d Cutlist(s) gefunden" % len(self.cutlists)
 		print
 
-		if not self.cutlists:
-			return False
+		#Not necessary because of own cutlists
+		#if not self.cutlists:
+		#	return False
 
 
 		self.cutlists.sort(key =  lambda x: -float(x['metarating']))
@@ -684,6 +769,11 @@ class CutFile:
 					print "Invalid: %s" % inp
 				else:
 					self.cutlists[show].ShowCuts(self.path, is_filecut = False, tempdir = self.cutoptions.tempdir)
+			elif inp.lower().startswith("own"):
+				self.cutlists.append(self.cutoptions.owncutlistprov.makeCutList(self.path))
+				#TODO: print list again. But CutListToConsoleText relies on too many anyoing attributes... ;)
+				#for i, cutlist in enumerate(self.cutlists):
+				#	print cutlist.CutListToConsoleText(i+1)
 			else:
 				self.choosen = InterpreteNumber(inp)
 				if self.choosen != None:

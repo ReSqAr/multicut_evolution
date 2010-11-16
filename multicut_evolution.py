@@ -4,6 +4,7 @@
 """
     multicut_evolution -- Eine erweiterte Pythonversion von multicut_light.
     Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)
+	          (C) 2010  Matthias Kümmerer
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,7 +39,7 @@ C_RED			= "\033[41;37;1m"
 C_BLUE			= "\033[44;37;1m"
 C_RED_UNDERLINE	= "\033[41;37;1;4m"
 
-multicut_evolution_date = "14.11.2010"
+multicut_evolution_date = "17.11.2010"
 prog_id = "multicut_evolution.py/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
@@ -136,7 +137,8 @@ Beschreibung der Sprache für die Namensgebung von Dateien:
 """ % multicut_evolution_date
 
 
-print "multicut_light  Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
+print "multicut_evolution.py Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
+print "                                (C) 2010  Matthias Kümmerer"
 print "(URL: https://yhjz.de/public/gitweb/gitweb.cgi?p=multicut_evolution.git)"
 print "This program comes with ABSOLUTELY NO WARRANTY."
 print

@@ -105,6 +105,8 @@ Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
 		Ausgabepfad für alte Dateien [default: .]
 	virtualdub=
 		Pfad von vdub.exe [default: None]
+	avidemux_gui=
+		Befehl zum Ausführen einer Avidemux-Version mit GUI. [default: avidemux2_qt4]
 	cachedir=
 		Pfad zu Cache [default: ~/.cache/mutlicut/]
 		Ein leerer Pfad bedeutet kein Cachen.
@@ -540,7 +542,7 @@ class CutListGenerator:
 		#
 		print "%s Starte Avidemux. Das Projekt muss manuell gespeichert werden. %s" % (C_RED, C_CLEAR)
 		#$avidemux --nogui --force-smart --run "$avidemux_project" --save-workbench "$avidemux_project" # 1>/dev/null 2>/dev/null
-		out, err = Run('avidemux2_qt4', ["--force-smart", "--run", self.tmppath, "--save-workbench", self.tmppath])
+		out, err = Run(self.cutlistprov.cutoptions.cmd_AviDemux_Gui, ["--force-smart", "--run", self.tmppath, "--save-workbench", self.tmppath])
 		
 		#
 		# post processing
@@ -640,7 +642,8 @@ class CutOptions:
 		self.cachedir= os.path.expanduser("~/.cache/multicut_evolution/")
 
 		self.cmd_VirtualDub = None
-
+		self.cmd_AviDemux_Gui = "avidemux2_qt4"
+		
 		self.cutnameformat = "{base}-cut{rating}.{ext}"
 		self.uncutnameformat = "{full}"
 
@@ -721,6 +724,8 @@ class CutOptions:
 						self.uncutdir= os.path.expanduser(opt)
 					elif cmd == "virtualdub":
 						self.cmd_VirtualDub = os.path.expanduser(opt)
+					elif cmd == 'avidemux_gui':
+						self.cmd_AviDemux_Gui = os.path.expanduser(opt)
 					elif cmd == "cachedir":
 						self.cachedir= os.path.expanduser(opt)
 

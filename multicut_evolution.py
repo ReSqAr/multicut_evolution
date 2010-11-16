@@ -936,15 +936,8 @@ class CutFile:
 		print "	%s %s %s" % (C_RED, self.filename, C_CLEAR)
 		print 
 
-
 		self.currentprov = None
 		self.cutlist = None
-		
-		print "Verfügbare Provider:"
-		for key, value in sorted(self.cutoptions.cutlistprovider.items(), key=lambda x:x[0]): #sort by name
-			std = " [default]" if key == self.cutoptions.defaultprovider else ""
-			print "  %s - %s%s" % (key,value.desc,std)
-		print
 		
 		while not self.cutlist:
 			if not self.currentprov:
@@ -1256,7 +1249,13 @@ def main():
 	print
 	print "%s Cutlists auswählen für insgesamt %d Datei(en): %s" %(C_RED_UNDERLINE, len(avis), C_CLEAR)
 	print
+	print "Verfügbare Provider:"
+	for key, value in sorted(o.cutlistprovider.items(), key=lambda x:x[0]): #sort by name
+		std = " [default]" if key == o.defaultprovider else ""
+		print "  %s - %s%s" % (key,value.desc,std)
 	print
+	print
+	
 	
 	while avis2Choose:
 		# choose

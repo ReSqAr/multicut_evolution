@@ -106,7 +106,8 @@ Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
 	virtualdub=
 		Pfad von vdub.exe [default: None]
 	avidemux_gui=
-		Befehl zum Ausführen einer Avidemux-Version mit GUI. [default: avidemux2_qt4]
+		Befehl zum Ausführen einer Avidemux-Version mit GUI. 
+		[default: avidemux2_qt4]
 	cachedir=
 		Pfad zu Cache [default: ~/.cache/mutlicut/]
 		Ein leerer Pfad bedeutet kein Cachen.
@@ -120,6 +121,9 @@ Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
 		Ausdruck für Ausgabename (s.u.) [default: {base}-cut{rating}.{ext}]
 	uncutname=
 		Ausdruck für Ausgabename (s.u.) [default: {full}]
+	autor=
+		Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
+		wird.
 
 
 Beschreibung der Sprache für die Namensgebung von Dateien:
@@ -275,6 +279,20 @@ class FileCache:
 	def readFileContent(self, uuid):
 		fname = self.getFileName(uuid)
 		return codecs.open(fname, 'r', 'utf8').read()
+		
+	def updateContent(self, x, content):
+		uuid = hashlib.sha1(x).hexdigest()
+		
+		print "update", x
+		print content
+		
+		if uuid in self.fileCache:
+			fname = self.getFileName(uuid)
+			codecs.open(fname, 'w', 'utf8').write(content)
+		else:
+			self.appendFileCache(uuid, content)
+		
+		self.memoryCache[uuid] = content
 	
 	#
 	# actual getter
@@ -297,24 +315,42 @@ class FileCache:
 			self.memoryCache[uuid] = content
 			return content
 
+
 #
 # CutList Class
 #
 class CutList:
-	def __init__(self, cutlistprov, cutlist):
+	def __init__(self, cutlistprov, cutlist=None, cutlist_dict=None):
 		self.cutlistprov = cutlistprov
-		#tags: 'id', 'name', 'rating', 'ratingcount', 'author', 'ratingbyauthor', 'actualcontent', 'usercomment', 'cuts', 'filename', 
-		# 'filename_original', 'autoname', 'withframes', 'withtime', 'duration', 'errors', 'othererrordescription', 'downloadcount'
-		tagvalues = re.findall("<(?P<tag>.*?)>\s*(?P<value>.*?)\s*</(?P=tag)>", cutlist, re.DOTALL) #python is so cool
-		self.attr = dict(tagvalues)
-		def ToF(a, default):
-			try:	return float(a)
-			except:	return default
-		self.attr["metarating"] = ToF(self.attr['rating'],-1) \
-								+ ToF(self.attr['ratingbyauthor'],-1) \
-								+ ToF(self.attr['ratingcount'],0)/50 \
-								+ ToF(self.attr['downloadcount'],0)/1000
-
+		
+		if cutlist:
+			#tags: 'id', 'name', 'rating', 'ratingcount', 'author', 'ratingbyauthor', 'actualcontent', 'usercomment', 'cuts', 'filename', 
+			# 'filename_original', 'autoname', 'withframes', 'withtime', 'duration', 'errors', 'othererrordescription', 'downloadcount'
+			tagvalues = re.findall("<(?P<tag>.*?)>\s*(?P<value>.*?)\s*</(?P=tag)>", cutlist, re.DOTALL) #python is so cool
+			self.attr = dict(tagvalues)
+		elif cutlist_dict:
+			self.attr = dict(cutlist_dict)
+		else:
+			raise ValueError("CutList was called with illegal arguments.")
+		
+		#
+		# create metarating
+		#
+		if 'rating' in self.attr and 'ratingbyauthor' in self.attr and 'ratingcount' in self.attr and 'downloadcount' in self.attr:
+			def ToF(a, default):
+				try:	return float(a)
+				except:	return default
+			self.attr["metarating"] = ToF(self.attr['rating'],-1) \
+									+ ToF(self.attr['ratingbyauthor'],-1) \
+									+ ToF(self.attr['ratingcount'],0)/50 \
+									+ ToF(self.attr['downloadcount'],0)/1000
+		else:
+			self.attr["metarating"] = 0.
+	
+	
+	def __contains__(self, key):
+		return key in self.attr
+	
 	def __getitem__(self, key):
 		return self.attr[key]
 
@@ -480,6 +516,7 @@ class CutListAT:
 		self.opener = urllib2.build_opener()
 		self.opener.addheaders = [ ('User-agent', prog_id)]
 		self.cutoptions = cutoptions
+		self.desc = "Cutlists von Cutlist.at herunterladen."
 		
 		self.cutlistCache = FileCache("cutlist", cutoptions.cachedir, self._GetCutList,
 								cutlist_expire_period, lambda x: Debug(2, x))
@@ -507,20 +544,129 @@ class CutListAT:
 		Debug(2, "rate cutlist %s with %d" % (cl_id, rating))
 		url = "rate.php?rate=%s&rating=%d" % (cl_id, rating)
 		return self.Get(url)
+	
+	#
+	# getView
+	#
+	def getView(prov, path):
+		filename = os.path.basename(path)
+		
+		class View:
+			def __init__(self):
+				print "Hole Übersicht von cutlist.at..."
+				self.cutlists = prov.ListAll(filename)
+				print "%d Cutlist(s) gefunden" % len(self.cutlists)
+				print
+				
+				self.cutlists.sort(key =  lambda x: -float(x['metarating']))
 
+				for i, cutlist in enumerate(self.cutlists):
+					print cutlist.CutListToConsoleText(i+1)
+			
+			def getCutlist(self, inp, **kwargs):
+				try:
+					i = int(inp)-1
+					if 0 <= i < len(self.cutlists):
+						return self.cutlists[i]
+					else:
+						print "Illegaler Index."
+						return None
+				except:
+					print "Illegale Eingabe."
+					return None
+		return View()
+			
+			
 #
 # CutListOwnProvider
 #
 class CutListOwnProvider:
 	def __init__(self, cutoptions):
 		self.cutoptions = cutoptions
+		self.desc = "Eigene Cutlists erstellen."
+		
+		self.cutlistCache = FileCache("mycutlist", cutoptions.cachedir, lambda x: "", None, lambda x: Debug(2, x))
+		self.delimiter = "66b29df4086fd34e6c63631553132e8421d5fe3698ba5120358ee31ffed9b518e61d0b0ed6a583ec1fd7367aab7af928196391f3131929\n"
 	
-	def makeCutList(self, filename):
-		return CutListGenerator(self).makeCutList(filename)
+	def getCutlists(self, filename):
+		precutlists = self.cutlistCache.get(filename)
+		precutlists = precutlists.split(self.delimiter) if precutlists else []
+		precutlists = [ cutlist.split('\n',1) for cutlist in precutlists ]
+		return [ (comment, CutList(self,cutlist_dict={'id':precutlist})) for comment, precutlist in precutlists ]
+	
+	def addCutlist(self, filename, cutlist):
+		precutlists = self.cutlistCache.get(filename)
+		precutlists = precutlists.split(self.delimiter) if precutlists else []
+		
+		addcutlist = "%s\n%s" % (datetime.datetime.now().strftime("%H:%M am %d.%m.%Y"), cutlist)
+		
+		precutlists.append(addcutlist)
+		self.cutlistCache.updateContent(filename, self.delimiter.join(precutlists))
+	
+	def createCutlist(self, path):
+		cutlist = CutListGenerator(self).makeCutList(path)
+		if cutlist:
+			self.addCutlist(os.path.basename(path), cutlist)
+			return CutList(self,cutlist_dict={'id':cutlist}) #full abuse
+		else:
+			return None
+		
+	def getView(prov, path):
+		filename = os.path.basename(path)
+		
+		class View:
+			def __init__(self):
+				self.cutlists = prov.getCutlists(filename)
+				print "%d Cutlist(s) gefunden" % len(self.cutlists)
+
+				for i, cutlist in enumerate(self.cutlists):
+					print "[%2d] Cutlist: %s" % (i+1,cutlist[0])
+				print "[ n] neue Cutlist erstellen"
+
+			def getCutlist(self, inp, **kwargs):
+				if inp.strip() == 'n':
+					return prov.createCutlist(path)
+				else:
+					try:
+						i = int(inp)-1
+						if 0 <= i < len(self.cutlists):
+							return self.cutlists[i][1]
+						else:
+							print "Illegaler Index."
+							return None
+					except:
+						print "Illegale Eingabe."
+						return None
+		return View()
+	
+	def GetCutList(self, cl_id):
+		return cl_id
+
+#
+# CutListFileProvider
+#
+class CutListFileProvider:
+	def __init__(self, cutoptions):
+		self.cutoptions = cutoptions
+		self.desc = "Cutlists von der Festplatte benutzen."
+
+	def getView(prov, path):
+		class View:
+			def __init__(self):
+				print "[  ] Dateipfad eingeben."
+			
+			def getCutlist(self, inp, **kwargs):
+				if os.path.isfile(inp):
+					return CutList(prov,cutlist_dict={'id':inp})
+				else:
+					print "'%s' ist keine gültige Datei." % inp
+					return None
+		return View()
 	
 	def GetCutList(self, cl_id):
 		Debug(2, "CutListOwnProvider::GetCutList: %s" % cl_id)
 		return open(cl_id).read()
+
 
 #
 # CutListGenerator
@@ -540,8 +686,7 @@ class CutListGenerator:
 		#
 		# start avidemux
 		#
-		print "%s Starte Avidemux. Das Projekt muss manuell gespeichert werden. %s" % (C_RED, C_CLEAR)
-		#$avidemux --nogui --force-smart --run "$avidemux_project" --save-workbench "$avidemux_project" # 1>/dev/null 2>/dev/null
+		print "%s Starte Avidemux. Das Projekt muss manuell gespeichert werden und Avidemux beendet. %s" % (C_RED, C_CLEAR)
 		out, err = Run(self.cutlistprov.cutoptions.cmd_AviDemux_Gui, ["--force-smart", "--run", self.tmppath, "--save-workbench", self.tmppath])
 		
 		#
@@ -575,12 +720,7 @@ class CutListGenerator:
 		#
 		# buidling cutlist
 		#
-		idstr = '<rating></rating><ratingbyauthor></ratingbyauthor>\n'\
-			+ '<ratingcount></ratingcount>\n'\
-			+ '<downloadcount></downloadcount>\n'\
-			+ '<id>%s</id>' % self.cutlistfile
-		
-		return CutList(self.cutlistprov,idstr)
+		return cutlist
 	
 	def writePreAvidemuxProject(self):
 		pstr = '//AD\n'\
@@ -604,8 +744,8 @@ class CutListGenerator:
 			+ 'CutCommandLine=\n'\
 			+ 'NoOfCuts=%s\n' % self.numberOfCuts\
 			+ '[Info]\n'\
-			+ 'Author=%s\n' % "jemand"\
-			+ 'RatingByAuthor=%s\n' % self.rating\
+			+ 'Author=%s\n' % self.cutlistprov.cutoptions.author\
+			+ 'RatingByAuthor=%s\n' % ""\
 			+ 'EPGError=%s\n' % ""\
 			+ 'ActualContent=%s\n' % ""\
 			+ 'MissingBeginning=%s\n' % ""\
@@ -634,13 +774,14 @@ class CutListGenerator:
 # CutOptions Class
 #
 class CutOptions:
-	def __init__(self, class_cutlistprov, configfile = None):
+	def __init__(self, configfile = None):
 		# init values
 		self.tempdir = tempfile.mkdtemp(prefix = "multicut_evolution")
 		self.cutdir  = os.getcwd()
 		self.uncutdir= os.getcwd()
 		self.cachedir= os.path.expanduser("~/.cache/multicut_evolution/")
-
+		self.author  = "Mr Wayne"
+		
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
 		
@@ -668,8 +809,7 @@ class CutOptions:
 			if not os.path.exists(d):
 				Debug(4, "init: create directory: %s" % d)
 				os.makedirs(d)
-
-
+				
 		# find avidemux
 		for avidemux in avidemux_cmds:
 			try:
@@ -697,8 +837,12 @@ class CutOptions:
 		print "Benutze als AviDemux: %s (v:%s)" % (self.cmd_AviDemux, self.cmd_AviDemux_version)
 		print "Benutze als VirtualDub: %s" % self.cmd_VirtualDub
 		
-		self.cutlistprov = class_cutlistprov(self) #init prov
-		self.owncutlistprov = CutListOwnProvider(self)
+		self.cutlistprovider = {
+								'internet': CutListAT(self),
+								'own': 		CutListOwnProvider(self),
+								'file':		CutListFileProvider(self),
+							}
+		self.defaultprovider = 'internet'
 
 		self.DefaultProjectClass = AviDemuxProjectClass
 		self.RegisteredProjectClasses = {}
@@ -739,6 +883,9 @@ class CutOptions:
 						self.time_after_cut  = int(opt)
 					elif cmd == "bewerten":
 						self.do_rate = int(opt)
+					elif cmd == "autor":
+						self.author = opt
+					
 				except StandardError, e:
 					print "ConfigParse: Could not parse '%s' due to:" % line
 					print e
@@ -750,7 +897,7 @@ class CutOptions:
 			cutlist, filename = data
 			format = {}
 			# cutlist relevant
-			format["rating"] = str(int(100*float(cutlist["rating"])+0.5)) if cutlist["rating"] else ''
+			format["rating"] = str(int(100*float(cutlist["rating"])+0.5)) if "rating" in cutlist and cutlist["rating"] else ''
 			format["metarating"] = str(int(100*float(cutlist["metarating"])+0.5))
 			#filename relevant
 			format["full"] = filename
@@ -762,7 +909,7 @@ class CutOptions:
 				return self.uncutnameformat.format(**format)
 			
 		raise ValueError("'%s' is not valid" % name)
-		
+
 
 #
 # CutFile Class
@@ -778,57 +925,57 @@ class CutFile:
 		print 
 		print "	%s %s %s" % (C_RED, self.filename, C_CLEAR)
 		print 
-		print "Hole Übersicht von cutlist.at..."
-		self.cutlists = self.cutoptions.cutlistprov.ListAll(self.filename)
-		print "%d Cutlist(s) gefunden" % len(self.cutlists)
+
+
+		self.currentprov = None
+		self.cutlist = None
+		
+		print "Verfügbare Provider:"
+		for key, value in sorted(self.cutoptions.cutlistprovider.items(), key=lambda x:x[0]): #sort by name
+			std = " [default]" if key == self.cutoptions.defaultprovider else ""
+			print "  %s - %s%s" % (key,value.desc,std)
 		print
-
-		#Not necessary because of own cutlists
-		#if not self.cutlists:
-		#	return False
-
-
-		self.cutlists.sort(key =  lambda x: -float(x['metarating']))
 		
-		
-		for i, cutlist in enumerate(self.cutlists):
-			print cutlist.CutListToConsoleText(i+1)
-			
-		def InterpreteNumber(s):
-			try:
-				if 0 <= int(s)-1 < len(self.cutlists):		return int(s)-1
-				else:										return None
-			except:											return None
-		while True:
+		while not self.cutlist:
+			if not self.currentprov:
+				self.currentprov = self.cutoptions.cutlistprovider[self.cutoptions.defaultprovider].getView(self.path)
+				
 			print "Auswahl/Test: ",
 			inp = sys.stdin.readline().strip()
 			print
+			
 			if not inp:
 				print "Datei wird nicht geschnitten"
 				return False
+			
+			doTest = False
+			
+			# consume input string
+			while inp.strip():
+				inp = inp.lstrip()
+				
+				for prov in self.cutoptions.cutlistprovider.keys():
+					if inp.startswith(prov.lower()):
+						inp = inp[len(prov):]
+						
+						print "Providerwechsel nach '%s'" % prov
+						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path)
+						break
+				else:
+					if inp.lower().startswith('test'):
+						doTest = True
+						inp = inp[len('test'):]
+					else:
+						data, _, inp = inp.partition(' ')
+						self.cutlist = self.currentprov.getCutlist(data, currentcutlist = self.cutlist)
+			
+			if doTest:
+				if self.cutlist:
+					self.cutlist.ShowCuts(self.path, is_filecut = False, tempdir = self.cutoptions.tempdir)
+					self.cutlist = None
+				else:
+					print "Keine Cutlist angegeben zum Testen!"
 
-			if inp.lower().startswith("test "):
-				show = InterpreteNumber(inp[5:])
-				if show == None:
-					print "Invalid: %s" % inp
-				else:
-					self.cutlists[show].ShowCuts(self.path, is_filecut = False, tempdir = self.cutoptions.tempdir)
-			elif inp.lower().startswith("own"):
-				cutlist = self.cutoptions.owncutlistprov.makeCutList(self.path)
-				if cutlist:
-					self.choosen = None
-					self.cutlist = cutlist
-					break
-				else:
-					Debug(2, "Es wurde keine Cutlist zurückgeliefert.")
-			else:
-				self.choosen = InterpreteNumber(inp)
-				if self.choosen != None:
-					break
-		
-		if self.choosen != None:
-			self.cutlist = self.cutlists[self.choosen]
-		
 		return True
 
 
@@ -1077,7 +1224,7 @@ def main():
 		print prog_help
 		sys.exit()
 	
-	o = CutOptions(CutListAT, configfile)
+	o = CutOptions(configfile)
 
 
 	###

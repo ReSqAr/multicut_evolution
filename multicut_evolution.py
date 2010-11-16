@@ -283,9 +283,6 @@ class FileCache:
 	def updateContent(self, x, content):
 		uuid = hashlib.sha1(x).hexdigest()
 		
-		print "update", x
-		print content
-		
 		if uuid in self.fileCache:
 			fname = self.getFileName(uuid)
 			codecs.open(fname, 'w', 'utf8').write(content)
@@ -483,6 +480,9 @@ class CutList:
 		Run("mplayer", ["-edl", edlfile, "-sub", subfile, "-osdlevel", "3", path])
 		
 	def Rate(self):
+		if not self.cutlistprov.ratingSupported:
+			return
+		
 		text =  "\n@RED Bitte eine Bewertung für die Cutlist abgeben... @CLEAR\n"
 		text += "[0] Dummy oder keine Cutlist\n"
 		text += "[1] Anfang und Ende grob geschnitten\n"
@@ -516,7 +516,9 @@ class CutListAT:
 		self.opener = urllib2.build_opener()
 		self.opener.addheaders = [ ('User-agent', prog_id)]
 		self.cutoptions = cutoptions
+		
 		self.desc = "Cutlists von Cutlist.at herunterladen."
+		self.ratingSupported = True
 		
 		self.cutlistCache = FileCache("cutlist", cutoptions.cachedir, self._GetCutList,
 								cutlist_expire_period, lambda x: Debug(2, x))
@@ -584,6 +586,7 @@ class CutListOwnProvider:
 	def __init__(self, cutoptions):
 		self.cutoptions = cutoptions
 		self.desc = "Eigene Cutlists erstellen."
+		self.ratingSupported = False
 		
 		self.cutlistCache = FileCache("mycutlist", cutoptions.cachedir, lambda x: "", None, lambda x: Debug(2, x))
 		self.delimiter = "66b29df4086fd34e6c63631553132e8421d5fe3698ba5120358ee31ffed9b518e61d0b0ed6a583ec1fd7367aab7af928196391f3131929\n"
@@ -598,7 +601,7 @@ class CutListOwnProvider:
 		precutlists = self.cutlistCache.get(filename)
 		precutlists = precutlists.split(self.delimiter) if precutlists else []
 		
-		addcutlist = "%s\n%s" % (datetime.datetime.now().strftime("%H:%M am %d.%m.%Y"), cutlist)
+		addcutlist = "%s\n%s" % (datetime.datetime.now().strftime("%H:%M:%S am %d.%m.%Y"), cutlist)
 		
 		precutlists.append(addcutlist)
 		self.cutlistCache.updateContent(filename, self.delimiter.join(precutlists))
@@ -649,6 +652,7 @@ class CutListFileProvider:
 	def __init__(self, cutoptions):
 		self.cutoptions = cutoptions
 		self.desc = "Cutlists von der Festplatte benutzen."
+		self.ratingSupported = False
 
 	def getView(prov, path):
 		class View:
@@ -678,7 +682,7 @@ class CutListGenerator:
 	def makeCutList(self, filename):
 		self.filename = filename
 		self.basename = os.path.basename(filename)
-		self.tmpname = "own_%s_project.js" % random.getrandbits(32)
+		self.tmpname = "%s_own_project.js" % random.getrandbits(32)
 		self.tmppath = self.cutlistprov.cutoptions.tempdir + self.tmpname
 		self.cutlistfile = self.cutlistprov.cutoptions.tempdir+self.basename+'.cutlist'
 		self.writePreAvidemuxProject()
@@ -707,8 +711,6 @@ class CutListGenerator:
 		else:
 			grapFPS = project.split("app.video.setFps1000")[1].split('(')[1].split(')')[0].strip()
 		self.FPS = float(grapFPS)*0.001
-		self.rating = 5 #TODO
-		
 		
 		#
 		# writing cutlist to self.cutlistfile
@@ -726,7 +728,6 @@ class CutListGenerator:
 		pstr = '//AD\n'\
 			+ 'var app = new Avidemux();\n'\
 			+ 'app.load("%s");\n' % self.filename
-		#TODO: Some strange nextfilethings for merging
 		open(self.tmppath, "a").write(pstr)
 	
 	def generateCutList(self, segments):

@@ -506,24 +506,54 @@ class CutListAT:
 		url = "rate.php?rate=%s&rating=%d" % (cl_id, rating)
 		return self.Get(url)
 
+#
+# CutListOwnProvider
+#
 class CutListOwnProvider:
 	def __init__(self, cutoptions):
 		self.cutoptions = cutoptions
+	
+	def makeCutList(self, filename):
+		return CutListGenerator(self).makeCutList(filename)
+	
+	def GetCutList(self, cl_id):
+		Debug(2, "CutListOwnProvider::GetCutList: %s" % cl_id)
+		return open(cl_id).read()
+
+#
+# CutListGenerator
+#
+class CutListGenerator:
+	def __init__(self, cutlistprov):
+		self.cutlistprov = cutlistprov
+	
 	def makeCutList(self, filename):
 		self.filename = filename
 		self.basename = os.path.basename(filename)
-		self.tmpname = 'project.js'
-		self.tmppath = self.cutoptions.tempdir + self.tmpname
-		self.cutlistfile = self.cutoptions.tempdir+self.basename+'.cutlist'
-		self.writeAvidemuxProject()
-		print "starting avidemux. Don't forget to save the project"
+		self.tmpname = "own_%s_project.js" % random.getrandbits(32)
+		self.tmppath = self.cutlistprov.cutoptions.tempdir + self.tmpname
+		self.cutlistfile = self.cutlistprov.cutoptions.tempdir+self.basename+'.cutlist'
+		self.writePreAvidemuxProject()
+		
+		#
+		# start avidemux
+		#
+		print "%s Starte Avidemux. Das Projekt muss manuell gespeichert werden. %s" % (C_RED, C_CLEAR)
 		#$avidemux --nogui --force-smart --run "$avidemux_project" --save-workbench "$avidemux_project" # 1>/dev/null 2>/dev/null
-		out, err = Run('avidemux2_qt4', ["--force-smart", "--run", self.tmppath])#, "--save-workbench", self.tmppath])
-		#Todo: Care about return?
-		project = open(self.tmppath, 'r').read()
-		if not "app.addSegment" in project:
-			print "No cuts added!"
+		out, err = Run('avidemux2_qt4', ["--force-smart", "--run", self.tmppath, "--save-workbench", self.tmppath])
+		
+		#
+		# post processing
+		#
+		try:
+			project = open(self.tmppath, 'r').read()
+		except:
+			print "Keine Datei gespeichert!"
 			return None
+		if not "app.addSegment" in project:
+			print "Keine Schnitte angegeben!"
+			return None
+		
 		self.numberOfCuts = len(project.split("app.addSegment"))-1
 		if "app.video.fps1000" in project:
 			grapFPS = project.split("app.video.fps1000")[1].split('=')[1].split(';')[0].strip()
@@ -531,24 +561,39 @@ class CutListOwnProvider:
 			grapFPS = project.split("app.video.setFps1000")[1].split('(')[1].split(')')[0].strip()
 		self.FPS = float(grapFPS)*0.001
 		self.rating = 5 #TODO
-		self.infos = 1 #TODO
-		self.writeCutListHeader()
-		cut = 0
-		for segment in project.split("app.addSegment(0")[1:]:
-			self.writeCutListSegment(segment, cut)
-			cut += 1
+		
+		
+		#
+		# writing cutlist to self.cutlistfile
+		#
+		cutlist = self.generateCutList(project.split("app.addSegment(0")[1:])
+		Debug(3, "Created cutlist:\n"+cutlist)
+		open(self.cutlistfile, "w").write(cutlist)
+		
+		#
+		# buidling cutlist
+		#
 		idstr = '<rating></rating><ratingbyauthor></ratingbyauthor>\n'\
 			+ '<ratingcount></ratingcount>\n'\
 			+ '<downloadcount></downloadcount>\n'\
-			+ '<id>%s</id>' %self.cutlistfile
-		return CutList(self,idstr)
-	def writeCutListHeader(self):
-		str = '[General]\n'\
-			+ 'Application=cutlist.sh\n'\
+			+ '<id>%s</id>' % self.cutlistfile
+		
+		return CutList(self.cutlistprov,idstr)
+	
+	def writePreAvidemuxProject(self):
+		pstr = '//AD\n'\
+			+ 'var app = new Avidemux();\n'\
+			+ 'app.load("%s");\n' % self.filename
+		#TODO: Some strange nextfilethings for merging
+		open(self.tmppath, "a").write(pstr)
+	
+	def generateCutList(self, segments):
+		cstr = '[General]\n'\
+			+ 'Application=multicut_evolution.py\n'\
 			+ 'Version=$Stand\n'\
 			+ 'comment1=Diese Cutlist unterliegt den Nutzungsbedingungen von cutlist.at (Stand: 14.Oktober 2008)\n'\
-			+ 'comment2=http://cutlist.at/terms/'\
-			+ 'ApplyToFile=%s' % self.basename\
+			+ 'comment2=http://cutlist.at/terms/\n'\
+			+ 'ApplyToFile=%s\n' % self.basename\
 			+ 'OriginalFileSizeBytes=%s\n' % os.path.getsize(self.filename)\
 			+ 'FramesPerSecond=%s\n' % self.FPS\
 			+ 'IntendedCutApplication=Avidemux\n'\
@@ -569,26 +614,20 @@ class CutListOwnProvider:
 			+ 'OtherErrorDescription=%s\n' % ""\
 			+ 'SuggestedMovieName=%s\n' % ""\
 			+ 'UserComment=%s\n' % ""
-		open(self.cutlistfile, "w").write(str)
-	def writeCutListSegment(self, segment, cut):
-		start=segment.split(',')[1]
-		duration=segment.split(',')[2].split(')')[0]
-		str = '[Cut%s]\n' % cut\
-			+ 'Start=%f\n' % (float(start)/self.FPS) \
-			+ 'StartFrame=%s\n' %start\
-			+ 'Duration=%f\n' % (float(duration)/self.FPS) \
-			+ 'DurationFrames=%s\n\n' % duration
-		open(self.cutlistfile, "a").write(str)
-	def writeAvidemuxProject(self):
-		str = '//AD\n'\
-			+ 'var app = new Avidemux();\n'\
-			+ 'app.load("%s");\n' % self.filename
-		#TODO: Some strange nextfilethings for merging
-		self.Write(str)
-	def Write(self, text, mode = "a"):
-		open(self.tmppath, mode).write(text)
-	def GetCutList(self, cl_id):
-		return open(cl_id).read()
+			
+		for cut, segment in enumerate(segments):
+			start    = segment.split(',')[1]
+			duration = segment.split(',')[2].split(')')[0]
+			cstr += '[Cut%s]\n' % cut\
+				+ 'Start=%f\n' % (float(start)/self.FPS) \
+				+ 'StartFrame=%s\n' %start\
+				+ 'Duration=%f\n' % (float(duration)/self.FPS) \
+				+ 'DurationFrames=%s\n\n' % duration
+		
+		return cstr
+
+		
+
 #
 # CutOptions Class
 #
@@ -770,15 +809,21 @@ class CutFile:
 				else:
 					self.cutlists[show].ShowCuts(self.path, is_filecut = False, tempdir = self.cutoptions.tempdir)
 			elif inp.lower().startswith("own"):
-				self.cutlists.append(self.cutoptions.owncutlistprov.makeCutList(self.path))
-				#TODO: print list again. But CutListToConsoleText relies on too many anyoing attributes... ;)
-				#for i, cutlist in enumerate(self.cutlists):
-				#	print cutlist.CutListToConsoleText(i+1)
+				cutlist = self.cutoptions.owncutlistprov.makeCutList(self.path)
+				if cutlist:
+					self.choosen = None
+					self.cutlist = cutlist
+					break
+				else:
+					Debug(2, "Es wurde keine Cutlist zurückgeliefert.")
 			else:
 				self.choosen = InterpreteNumber(inp)
 				if self.choosen != None:
 					break
-		self.cutlist = self.cutlists[self.choosen]
+		
+		if self.choosen != None:
+			self.cutlist = self.cutlists[self.choosen]
+		
 		return True
 
 

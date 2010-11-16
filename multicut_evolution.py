@@ -670,7 +670,7 @@ class CutListFileProvider:
 		return View()
 	
 	def GetCutList(self, cl_id):
-		Debug(2, "CutListOwnProvider::GetCutList: %s" % cl_id)
+		Debug(2, "CutListFileProvider::GetCutList: %s" % cl_id)
 		return open(cl_id).read()
 
 

@@ -488,35 +488,10 @@ class CutList:
 		open(subfile,"w").write(sub)
 			
 		Run("mplayer", ["-edl", edlfile, "-sub", subfile, "-osdlevel", "3", path])
-		
-	def Rate(self):
-		if not self.cutlistprov.ratingSupported:
-			return
-		
-		text =  "\n@RED Bitte eine Bewertung für die Cutlist abgeben... @CLEAR\n"
-		text += "[0] Dummy oder keine Cutlist\n"
-		text += "[1] Anfang und Ende grob geschnitten\n"
-		text += "[2] Anfang und Ende halbwegs genau geschnitten\n"
-		text += "[3] Schnitt ist annehmbar, Werbung entfernt\n"
-		text += "[4] Doppelte Szenen wurde nicht entfernt oder schönere Schnitte möglich\n"
-		text += "[5] Sämtliches unerwünschtes Material wurde framegenau entfernt"
-		print text.replace("@BLUE", C_BLUE).replace("@RED", C_RED).replace("@CLEAR", C_CLEAR)
+	
+	def PostProcessCutList(self):
+		self.cutlistprov.PostProcessCutList( self.attr["id"] )
 
-		print "Wertung: ",
-		try:
-			inp = sys.stdin.readline()[:-1]# without newline
-		except StandardError:
-			sys.exit()
-		inp = inp.strip()
-		print
-		if inp:
-			try:
-				i = int(inp)
-				if 0 <= i <= 5:
-					print u"Sende für Cutlist-ID '%s' die Bewertung %d..." % (self.attr["id"], i),
-					print "Antwort: '%s'" % self.cutlistprov.RateCutList(self.attr["id"], i)
-			except:
-				pass
 
 #
 # CutListAT as CutlistProviderClass
@@ -528,7 +503,6 @@ class CutListAT:
 		self.cutoptions = cutoptions
 		
 		self.desc = "Cutlists von Cutlist.at herunterladen."
-		self.ratingSupported = True
 		
 		self.cutlistCache = FileCache("cutlist", cutoptions.cachedir, self._GetCutList,
 								cutlist_expire_period, lambda x: Debug(2, x))
@@ -587,8 +561,44 @@ class CutListAT:
 					print "Illegale Eingabe."
 					return None
 		return View()
+	
+	#
+	# rate cutlist
+	#
+	def PostProcessCutList( self, cl_id ):
+		if not self.cutoptions.do_rate:
+			print "Bewerten ausgelassen."
+			return
 			
-			
+		print
+		print "@RED Bitte eine Bewertung für die Cutlist abgeben... @CLEAR".replace("@RED", C_RED).replace("@CLEAR", C_CLEAR)
+		print "[0] Dummy oder keine Cutlist"
+		print "[1] Anfang und Ende grob geschnitten"
+		print "[2] Anfang und Ende halbwegs genau geschnitten"
+		print "[3] Schnitt ist annehmbar, Werbung entfernt"
+		print "[4] Doppelte Szenen wurde nicht entfernt oder schönere Schnitte möglich"
+		print "[5] Sämtliches unerwünschtes Material wurde framegenau entfernt"
+		print
+
+		while True:
+			print "Wertung: ",
+			try:
+				inp = sys.stdin.readline().strip()
+			except StandardError:
+				sys.exit()
+			if not inp:
+				break
+			else:
+				try:
+					i = int(inp)
+					if 0 <= i <= 5:
+						print u"Sende für Cutlist-ID '%s' die Bewertung %d..." % (cl_id, i),
+						print "Antwort: '%s'" % self.RateCutList(cl_id, i)
+						break
+				except:
+					print "Illegale Eingabe"
+
+	
 #
 # CutListOwnProvider
 #
@@ -596,7 +606,6 @@ class CutListOwnProvider:
 	def __init__(self, cutoptions):
 		self.cutoptions = cutoptions
 		self.desc = "Eigene Cutlists erstellen."
-		self.ratingSupported = False
 		
 		self.cutlistCache = FileCache("mycutlist", cutoptions.cachedir, lambda x: "", None, lambda x: Debug(2, x))
 		self.delimiter = "66b29df4086fd34e6c63631553132e8421d5fe3698ba5120358ee31ffed9b518e61d0b0ed6a583ec1fd7367aab7af928196391f3131929\n"
@@ -624,6 +633,12 @@ class CutListOwnProvider:
 		else:
 			return None
 		
+	def GetCutList(self, cl_id):
+		return cl_id
+	
+	#
+	# getView
+	#
 	def getView(prov, path):
 		filename = os.path.basename(path)
 		
@@ -651,9 +666,12 @@ class CutListOwnProvider:
 						print "Illegale Eingabe."
 						return None
 		return View()
-	
-	def GetCutList(self, cl_id):
-		return cl_id
+
+	#
+	# upload cutlist
+	#
+	def PostProcessCutList( self, cl_id ):
+		print "Hochladen noch nicht implementiert."
 
 #
 # CutListFileProvider
@@ -662,8 +680,14 @@ class CutListFileProvider:
 	def __init__(self, cutoptions):
 		self.cutoptions = cutoptions
 		self.desc = "Cutlists von der Festplatte benutzen."
-		self.ratingSupported = False
+	
+	def GetCutList(self, cl_id):
+		Debug(2, "CutListFileProvider::GetCutList: %s" % cl_id)
+		return open(cl_id).read()
 
+	#
+	# getView
+	#
 	def getView(prov, path):
 		class View:
 			def __init__(self):
@@ -676,12 +700,12 @@ class CutListFileProvider:
 					print "'%s' ist keine gültige Datei." % inp
 					return None
 		return View()
-	
-	def GetCutList(self, cl_id):
-		Debug(2, "CutListFileProvider::GetCutList: %s" % cl_id)
-		return open(cl_id).read()
 
-
+	#
+	# noop
+	#
+	def PostProcessCutList( self, cl_id ):
+		pass
 #
 # CutListGenerator
 #
@@ -1034,9 +1058,9 @@ class CutFile:
 		inp = sys.stdin.readline().strip()
 		if inp != 'n':
 			self.cutlist.ShowCuts(self.cutpath, is_filecut = True, tempdir = self.cutoptions.tempdir)		
-			if self.cutoptions.do_rate:
-				self.cutlist.Rate()
-
+			self.cutlist.PostProcessCutList()
+		
+		print
 		sys.stdout.write("Annehmen? [J/n]: ")
 		sys.stdout.flush()
 		s = sys.stdin.readline().strip()

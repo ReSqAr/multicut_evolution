@@ -249,15 +249,18 @@ class FileCache:
 		for line in index.split('\n'):
 			if not line: continue
 			uuid, dt_raw = line.split('\t')
+			
+			fname = self.getFileName(uuid)
 			dt = self.convertString2Time(dt_raw)
+			
 			if self.expireperiod and dt + self.expireperiod < now:
-				fname = self.getFileName(uuid)
 				self.debug("FileCache('%s')::loadFileCache: removed expired file %s"%(self.name,fname))
 				self.debug("FileCache('%s')::loadFileCache: condition: %s + %s < %s" % (self.name, dt, self.expireperiod, now))
 				try: 	os.remove(fname)
 				except:	pass
 			else:
-				self.fileCache[uuid] = dt_raw
+				if os.path.isfile(fname):
+					self.fileCache[uuid] = dt_raw
 		
 		index = []
 		for uuid, dt_raw in self.fileCache.items():
@@ -285,8 +288,9 @@ class FileCache:
 	def updateContent(self, x, content):
 		uuid = hashlib.sha1(x).hexdigest()
 		
+		fname = self.getFileName(uuid)
+		
 		if uuid in self.fileCache:
-			fname = self.getFileName(uuid)
 			codecs.open(fname, 'w', 'utf8').write(content)
 		else:
 			self.appendFileCache(uuid, content)
@@ -302,17 +306,21 @@ class FileCache:
 		if uuid in self.memoryCache:
 			self.debug("FileCache('%s')::get('%s'): memory cache hit"%(self.name,x))
 			return self.memoryCache[uuid]
-		elif uuid in self.fileCache and self.fileCacheEnabled:
-			self.debug("FileCache('%s')::get('%s'): file cache hit"%(self.name,x))
-			content = self.readFileContent(uuid)
-			self.memoryCache[uuid] = content
-			return content
-		else:
-			self.debug("FileCache('%s')::get('%s'): total cache miss"%(self.name,x))
-			content = self.getter(x)
-			self.appendFileCache(uuid, content)
-			self.memoryCache[uuid] = content
-			return content
+		
+		try:
+			if uuid in self.fileCache and self.fileCacheEnabled:
+				self.debug("FileCache('%s')::get('%s'): file cache hit"%(self.name,x))
+				content = self.readFileContent(uuid)
+				self.memoryCache[uuid] = content
+				return content
+		except:
+			print "File not found associated with '%s' -- ignoring" % uuid
+		
+		self.debug("FileCache('%s')::get('%s'): total cache miss"%(self.name,x))
+		content = self.getter(x)
+		self.appendFileCache(uuid, content)
+		self.memoryCache[uuid] = content
+		return content
 
 
 #

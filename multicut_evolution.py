@@ -304,19 +304,19 @@ class FileCache:
 		uuid = hashlib.sha1(x).hexdigest()
 		
 		if uuid in self.memoryCache:
-			self.debug("FileCache('%s')::get('%s'): memory cache hit"%(self.name,x))
+			self.debug("FileCache('%s')::get('%s'): memory cache hit" % (self.name,x))
 			return self.memoryCache[uuid]
 		
 		try:
 			if uuid in self.fileCache and self.fileCacheEnabled:
-				self.debug("FileCache('%s')::get('%s'): file cache hit"%(self.name,x))
+				self.debug("FileCache('%s')::get('%s'): file cache hit" % (self.name,x))
 				content = self.readFileContent(uuid)
 				self.memoryCache[uuid] = content
 				return content
 		except:
-			print "File not found associated with '%s' -- ignoring" % uuid
+			print "File associated with '%s' not found -- ignoring" % uuid
 		
-		self.debug("FileCache('%s')::get('%s'): total cache miss"%(self.name,x))
+		self.debug("FileCache('%s')::get('%s'): total cache miss" % (self.name,x))
 		content = self.getter(x)
 		self.appendFileCache(uuid, content)
 		self.memoryCache[uuid] = content
@@ -331,7 +331,8 @@ class CutList:
 		self.cutlistprov = cutlistprov
 		
 		if cutlist:
-			#tags: 'id', 'name', 'rating', 'ratingcount', 'author', 'ratingbyauthor', 'actualcontent', 'usercomment', 'cuts', 'filename', 
+			#tags:
+			# 'id', 'name', 'rating', 'ratingcount', 'author', 'ratingbyauthor', 'actualcontent', 'usercomment', 'cuts', 'filename', 
 			# 'filename_original', 'autoname', 'withframes', 'withtime', 'duration', 'errors', 'othererrordescription', 'downloadcount'
 			tagvalues = re.findall("<(?P<tag>.*?)>\s*(?P<value>.*?)\s*</(?P=tag)>", cutlist, re.DOTALL) #python is so cool
 			self.attr = dict(tagvalues)
@@ -636,6 +637,21 @@ class CutListOwnProvider:
 	def GetCutList(self, cl_id):
 		return cl_id
 	
+	def UploadCutList(self, cutlist):
+		print "Cutlist zum Hochladen:"
+		lines = cutlist.split('\n')
+		fname = [line for line in lines if line.startswith("ApplyToFile=")]
+		if len(fname) != 1:
+			print "Illegale Cutlist, uploaden nicht möglich."
+			return
+		fname = fname[0][len("ApplyToFile="):].strip()
+		
+		print fname
+		print
+		print cutlist
+		print
+		print "Hochladen noch nicht implementiert."
+	
 	#
 	# getView
 	#
@@ -653,7 +669,11 @@ class CutListOwnProvider:
 
 			def getCutlist(self, inp, **kwargs):
 				if inp.strip() == 'n':
-					return prov.createCutlist(path)
+					cutlist = prov.createCutlist(path)
+					if cutlist:
+						self.cutlists.append( ('neu erstellt', cutlist) )
+						print "[%2d] Cutlist: %s" % (len(self.cutlists),self.cutlists[-1][0])
+					return cutlist
 				else:
 					try:
 						i = int(inp)-1
@@ -671,7 +691,65 @@ class CutListOwnProvider:
 	# upload cutlist
 	#
 	def PostProcessCutList( self, cl_id ):
-		print "Hochladen noch nicht implementiert."
+		print "Hochladen von Cutlists noch nicht implementiert."
+		return
+		
+		
+		attr = [	# display				internal  			default
+					['Autor',  				'Author', 			self.cutoptions.author],
+					['Ihre Bewertung', 	'RatingByAuthor', 	''],
+					['Kommentar',			'UserComment',		''],
+					['Filmnamensvorschlag', 'SuggestedMovieName',''],
+				]
+		
+			
+		sys.stdout.write("Cutlist hochladen [J/n]: ")
+		sys.stdout.flush()
+		s = sys.stdin.readline().strip()
+		if 'n' in s.lower():
+			return
+		
+		print
+		
+		while True:
+			for did in attr:
+				display, _, default = did
+
+				sys.stdout.write("%s[%s]: " % (display, default))
+				sys.stdout.flush()
+				s = sys.stdin.readline().strip()
+				if s.lower() == 'clear':
+					did[2] = ''
+				elif s:
+					did[2] = s
+			
+			infotxt = \
+				'[Info]\n'\
+				+ ''.join( ["%s=%s\n" % (internal, default) for _, internal, default in attr] ) \
+				+ 'EPGError=%s\n' % ""\
+				+ 'ActualContent=%s\n' % ""\
+				+ 'MissingBeginning=%s\n' % ""\
+				+ 'MissingEnding=%s\n' % ""\
+				+ 'MissingAudio=%s\n' % ""\
+				+ 'MissingVideo=%s\n' % ""\
+				+ 'OtherError=%s\n' % ""\
+				+ 'OtherErrorDescription=%s\n' % ""
+			
+			print
+			print "Cutlist Infotext:"
+			print infotxt
+			print
+			
+			sys.stdout.write("Cutlist annehmen [J/n]: ")
+			sys.stdout.flush()
+			s = sys.stdin.readline().strip()
+			if 'n' in s.lower():
+				continue
+			else:
+				break
+			
+		self.UploadCutList("%s\n%s" % (cl_id, infotxt))
+
 
 #
 # CutListFileProvider
@@ -771,30 +849,18 @@ class CutListGenerator:
 	def generateCutList(self, segments):
 		cstr = '[General]\n'\
 			+ 'Application=multicut_evolution.py\n'\
-			+ 'Version=$Stand\n'\
+			+ 'Version=%s\n' % multicut_evolution_date\
 			+ 'comment1=Diese Cutlist unterliegt den Nutzungsbedingungen von cutlist.at (Stand: 14.Oktober 2008)\n'\
 			+ 'comment2=http://cutlist.at/terms/\n'\
 			+ 'ApplyToFile=%s\n' % self.basename\
 			+ 'OriginalFileSizeBytes=%s\n' % os.path.getsize(self.filename)\
 			+ 'FramesPerSecond=%s\n' % self.FPS\
 			+ 'IntendedCutApplication=Avidemux\n'\
-			+ 'IntendedCutApplicationVersion=2.3.0\n'\
+			+ 'IntendedCutApplicationVersion=2.5\n'\
 			+ 'IntendedCutApplicationOptions=\n'\
 			+ 'CutCommandLine=\n'\
-			+ 'NoOfCuts=%s\n' % self.numberOfCuts\
-			+ '[Info]\n'\
-			+ 'Author=%s\n' % self.cutlistprov.cutoptions.author\
-			+ 'RatingByAuthor=%s\n' % ""\
-			+ 'EPGError=%s\n' % ""\
-			+ 'ActualContent=%s\n' % ""\
-			+ 'MissingBeginning=%s\n' % ""\
-			+ 'MissingEnding=%s\n' % ""\
-			+ 'MissingAudio=%s\n' % ""\
-			+ 'MissingVideo=%s\n' % ""\
-			+ 'OtherError=%s\n' % ""\
-			+ 'OtherErrorDescription=%s\n' % ""\
-			+ 'SuggestedMovieName=%s\n' % ""\
-			+ 'UserComment=%s\n' % ""
+			+ 'NoOfCuts=%s\n' % self.numberOfCuts
+
 			
 		for cut, segment in enumerate(segments):
 			start    = segment.split(',')[1]
@@ -1347,8 +1413,9 @@ def main():
 	###
 	print
 	print
-	print "%s Schneide %d Datei(en): %s" %(C_RED_UNDERLINE, len(cutfiles), C_CLEAR)
 	print
+	print
+	print "%s Schneide %d Datei(en): %s" %(C_RED_UNDERLINE, len(cutfiles), C_CLEAR)
 	print
 
 	checkfiles = []

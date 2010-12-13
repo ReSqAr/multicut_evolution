@@ -145,9 +145,10 @@ print
 
 
 avidemux_cmds = ["avidemux2_cli", "avidemux_cli",
-					"avidemux2", "avidemux", 
+					"avidemux2", "avidemux",
+					"avidemux2_qt4", "avidemux_qt4",
 					"avidemux2_gtk", "avidemux_gtk",
-					"avidemux2_qt4", "avidemux_qt4"]
+				]
 
 search_request_expire_period = datetime.timedelta(hours=2)
 cutlist_expire_period = datetime.timedelta(days=14)
@@ -582,9 +583,8 @@ class CutListAT:
 		print
 
 		while True:
-			print "Wertung: ",
 			try:
-				inp = sys.stdin.readline().strip()
+				inp = raw_input("Wertung: ").strip()
 			except StandardError:
 				sys.exit()
 			if not inp:
@@ -702,10 +702,7 @@ class CutListOwnProvider:
 					['Filmnamensvorschlag', 'SuggestedMovieName',''],
 				]
 		
-			
-		sys.stdout.write("Cutlist hochladen [J/n]: ")
-		sys.stdout.flush()
-		s = sys.stdin.readline().strip()
+		s = raw_input("Cutlist hochladen [J/n]: ").strip()
 		if 'n' in s.lower():
 			return
 		
@@ -714,10 +711,7 @@ class CutListOwnProvider:
 		while True:
 			for did in attr:
 				display, _, default = did
-
-				sys.stdout.write("%s[%s]: " % (display, default))
-				sys.stdout.flush()
-				s = sys.stdin.readline().strip()
+				s = raw_input("%s[%s]: " % (display, default)).strip()
 				if s.lower() == 'clear':
 					did[2] = ''
 				elif s:
@@ -740,9 +734,7 @@ class CutListOwnProvider:
 			print infotxt
 			print
 			
-			sys.stdout.write("Cutlist annehmen [J/n]: ")
-			sys.stdout.flush()
-			s = sys.stdin.readline().strip()
+			s = raw_input("Cutlist annehmen [J/n]: ").strip()
 			if 'n' in s.lower():
 				continue
 			else:
@@ -1040,9 +1032,8 @@ class CutFile:
 		while not self.cutlist:
 			if not self.currentprov:
 				self.currentprov = self.cutoptions.cutlistprovider[self.cutoptions.defaultprovider].getView(self.path)
-				
-			print "Auswahl/Test: ",
-			inp = sys.stdin.readline().strip()
+			
+			inp = raw_input("Auswahl/Test: ").strip()
 			print
 			
 			if not inp:
@@ -1120,20 +1111,15 @@ class CutFile:
 	
 	def ShowCut(self):		
 		print "%s Prüfe %s %s" % (C_RED, self.filename, C_CLEAR)
-		print "Schnitte mit mplayer zeigen -> Eingabetaste [Überspringen mit 'n']"
-		inp = sys.stdin.readline().strip()
+		inp = raw_input("Schnitte mit mplayer zeigen -> Eingabetaste [Überspringen mit 'n']").strip()
 		if inp != 'n':
 			self.cutlist.ShowCuts(self.cutpath, is_filecut = True, tempdir = self.cutoptions.tempdir)		
 			self.cutlist.PostProcessCutList()
 		
 		print
-		sys.stdout.write("Annehmen? [J/n]: ")
-		sys.stdout.flush()
-		s = sys.stdin.readline().strip()
+		s = raw_input("Annehmen? [J/n]: ").strip()
 		if 'n' in s.lower():
-			sys.stdout.write("Sind Sie sicher, dass die geschnitte Datei gelöscht werden soll? [J/n]")
-			sys.stdout.flush()
-			s = sys.stdin.readline().strip()
+			s = raw_input("Sind Sie sicher, dass die geschnitte Datei gelöscht werden soll? [J/n]").strip()
 			if not 'n' in s.lower():
 				print "%s Lösche %s %s" % (C_RED, self.cutpath, C_CLEAR)
 				try:	os.remove(self.cutpath)
@@ -1383,9 +1369,7 @@ def main():
 		
 		avis2Choose = None
 		while True:
-			sys.stdout.write("Auswahl(1,1-3,1-2-9): ")
-			sys.stdout.flush()
-			s = sys.stdin.readline().strip()
+			s = raw_input("Auswahl(1,1-3,1-2-9): ").strip()
 			if not s or 'n' in s:
 				break
 			elif 'a' in s:
@@ -1479,9 +1463,7 @@ def main():
 				
 			avis2Check = None
 			while True:
-				sys.stdout.write("Auswahl(1,1-3,1-2-9): ")
-				sys.stdout.flush()
-				s = sys.stdin.readline().strip()
+				s = raw_input("Auswahl(1,1-3,1-2-9): ").strip()
 				if not s or 'a' in s:
 					avis2Check = filesNeedCheck if filesNeedCheck else None
 					break

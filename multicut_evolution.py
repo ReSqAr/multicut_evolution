@@ -1391,6 +1391,7 @@ def main():
 
 		
 	cutfiles = cutfiles.values()
+	cutfiles.sort(key=lambda x: x.filename)
 	
 	###
 	# cut files

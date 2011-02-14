@@ -1111,10 +1111,8 @@ class CutFile:
 	
 	def ShowCut(self):		
 		print "%s Prüfe %s %s" % (C_RED, self.filename, C_CLEAR)
-		inp = raw_input("Schnitte mit mplayer zeigen -> Eingabetaste [Überspringen mit 'n']").strip()
-		if inp != 'n':
-			self.cutlist.ShowCuts(self.cutpath, is_filecut = True, tempdir = self.cutoptions.tempdir)		
-			self.cutlist.PostProcessCutList()
+		self.cutlist.ShowCuts(self.cutpath, is_filecut = True, tempdir = self.cutoptions.tempdir)
+		self.cutlist.PostProcessCutList()
 		
 		print
 		s = raw_input("Annehmen? [J/n]: ").strip()

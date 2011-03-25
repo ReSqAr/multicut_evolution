@@ -45,96 +45,116 @@ VERBOSITY_LEVEL = 0
 
 prog_help = \
 """
-Hilfe für multicut_evolution.py (%s):
+Hilfe für multicut_evolution.py ({VERSION}):
 
-multicut_evolution.py [--help] [--nocheck] [--verbosity $d] [--config $name] $file1 ...
+multicut_evolution.py [--help] [--verbosity $d] [<andere Optionen>] $file1 ...
 
 Die übergebenden Dateien werden anhand von auswählbaren Cutlists geschnitten.
-Dies geschieht in mehreren Phasen:
-
-Phase 1 - Auswahl der Cutlist
-	Für jede angegebene Datei wird eine Cutlistübersichtsseite angegeben. Daraus
-	kann man eine Cutlist auswählen, in dem man die Nummer eintippt und mit
-	Enter bestätigt und testen, indem man 'test $d' (wobei $d die Nummer der 
-	Cutlist ist) eintippt und mit Enter bestätigt. Einfach ohne Eingabe Enter
-	drücken, bewirkt, dass keine Cutlist ausgewählt wird.
-	Nachdem für alle Filme eine Cutlist ausgewählt wurde, hat man die Option
-	einzelne Cutlists umzuwählen oder alle zu bestätigen. Bestätigen
-	funktioniert einfach durch Enter drücken. Das Umwählen von Cutlists wird
-	durch Eingeben der zu den Filmen gehörenden Nummern ausgelöst. Dabei sind
-	Eingaben wie '1', '2-5' und '1,2-5' zulässig.
-
-Phase 2 - Schneiden
-	In dieser Phase ist keine Benutzerinteraktion notwendig.
-
-Phase 3 - Überprüfen der Schnitte
-	Nun können die Filme ausgewählt werden, die überprüft werden sollen. Dabei
-	können gewisse Filme angegeben durch ihre Nummer oder man überprüft alle
-	noch nicht überprüften Filme durch Eingabe von 'a'. Alternativ kann man alle
-	Filme überprüfen (auch die, die schon überprüft wurden) durch Eingabe von 
-	'f'. Desweiteren kann man das Programm durch 'n' beenden.
-	
-	Das Überprüfen untergliedert sich weiter, zu erst werden die Schnitte 
-	angezeigt, danach kann man die Cutlist bewerten mit Noten zwischen 0 - 5. 
-	(0 = schlechteste, 5 = beste Bewertung) Seien Sie fair! Danach kann man
-	angegeben, ob die geschnitte Datei gelöscht werden soll, was z.B. nach 
-	Fehlschnitten hilfreich ist. Dabei wird die Originaldatei an ihren 
-	ursprünglichen Ort zurückverschoben.
-
+Dies geschieht in mehreren Phasen die weiter unten beschrieben werden.
 
 Optionen:
-	--help
-		Zeigt dise Hilfe an
+    -h, --help
+        Zeigt dise Hilfe an
 
-	--nocheck
-		Geschnittene Dateien werden nicht zur Überprüfung 
-		wiedergegeben.
+    -n, --nocheck
+        Geschnittene Dateien werden nicht zur Überprüfung
+        wiedergegeben.
 
-	--config $name
-		Gibt den Namen der zu verwendenden Konfigurationsdatei an.
-		[default: ~/.multicut_evolution.conf]
-	
-	--verbosity $d
-		Debuginformationen werden entsprechend ausgegeben.
-		[default: 0, maximal 5]
+    -i, --only_internet
+        Falls online keine Cutlist gefunden werden kann, wird nicht
+        danach gefragt, ob der Benutzer eine eigene anlegen will.
 
-In der Konfigurationsdatei zur Verfügung stehenden Einstellungen (der 
-Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
-	cutdir= 
-		Ausgabepfad [default: .]
-	uncutdir=
-		Ausgabepfad für alte Dateien [default: .]
-	virtualdub=
-		Pfad von vdub.exe [default: None]
-	avidemux_gui=
-		Befehl zum Ausführen einer Avidemux-Version mit GUI. 
-		[default: avidemux2_qt4]
-	cachedir=
-		Pfad zu Cache [default: ~/.cache/mutlicut/]
-		Ein leerer Pfad bedeutet kein Cachen.
-	vorlauf=
-		Vorlauf bei der Überprüfung [default: 10]
-	nachlauf=
-		Nachlauf bei der Überprüfung [default: 5]
-	bewerten=
-		Gibt an, ob nach einer Wertung gefragt werden soll. [default:1]
-	cutname=
-		Ausdruck für Ausgabename (s.u.) [default: {base}-cut{rating}.{ext}]
-	uncutname=
-		Ausdruck für Ausgabename (s.u.) [default: {full}]
-	autor=
-		Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
-		wird.
+    -o, --no_internet, --offline
+        Es wird nicht online nach Cutlists gesucht.
+
+    --config $name
+        Gibt den Namen der zu verwendenden Konfigurationsdatei an.
+        [default: ~/.multicut_evolution.conf]
+    
+    --verbosity $d
+        Debuginformationen werden entsprechend ausgegeben.
+        [default: 0, maximal 5]
 
 
-Beschreibung der Sprache für die Namensgebung von Dateien:
-(siehe auch cutname=, uncutname=)
-	{base}		Dateiname ohne Endung
-	{ext}		Dateiendung
-	{shortext}	Dateiendung ohne mpg.
-	{rating}	Bewertung der Cutlist *100
-	{full}		Der gesamte Dateiname
-""" % multicut_evolution_date
+Ablauf:
+    Phase 1 - Auswahl oder anlegen einer Cutlist
+        Für jede angegebene Datei wird eine Cutlistübersichtsseite angegeben. Daraus
+        kann man eine Cutlist auswählen, in dem man die Nummer eintippt und mit
+        Enter bestätigt und testen, indem man 'test $d' (wobei $d die Nummer der
+        Cutlist ist) eintippt und mit Enter bestätigt. Einfach ohne Eingabe Enter
+        drücken, bewirkt, dass keine Cutlist ausgewählt wird (und damit die Datei
+        nicht geschnitten).
+        Wenn allerdings keine Cutlist gefunden wurde, weil z.B. noch niemand eine
+        Cutlist hochgeladen hat, dann besteht die Möglichkeit eine eigene Cutlist
+        anzulegen. Wenn man mit den existierenden Cutlists unzufrieden ist, kann
+        man auch in diesen Modus wechseln, indem man 'own' bei der Auswahl eingibt.
+        Mit 'n' kann man nun eine neue Cutlist anlegen, dazu wird Avidemux
+        gestartet. Man kann nun dort framegenau Segmente des Films herausnehmen
+        und mit Speichern diese Informationen multicut verfügbar machen.
+        Nachdem für alle Filme eine Cutlist ausgewählt wurde, hat man die Option
+        einzelne Cutlists umzuwählen oder alle zu bestätigen. Bestätigen
+        funktioniert einfach durch Enter drücken. Das Umwählen von Cutlists wird
+        durch Eingeben der zu den Filmen gehörenden Nummern ausgelöst. Dabei sind
+        Eingaben wie '1,2-5' zulässig.
+
+    Phase 2 - Schneiden
+        In dieser Phase ist keine Benutzerinteraktion notwendig.
+
+    Phase 3 - Überprüfen der Schnitte
+        Nun können die Filme ausgewählt werden, die überprüft werden sollen. Dabei
+        können gewisse Filme angegeben durch ihre Nummer oder man überprüft alle
+        noch nicht überprüften Filme durch Eingabe von 'a'. Alternativ kann man alle
+        Filme überprüfen (auch die, die schon überprüft wurden) durch Eingabe von
+        'f'. Desweiteren kann man das Programm durch 'n' beenden.
+
+        Das Überprüfen untergliedert sich weiter, zu erst werden die Schnitte
+        angezeigt, danach kann man die Cutlist bewerten mit Noten zwischen 0 - 5.
+        (0 = schlechteste, 5 = beste Bewertung) Seien Sie fair! Danach kann man
+        angegeben, ob die geschnitte Datei gelöscht werden soll, was z.B. nach
+        Fehlschnitten hilfreich ist. Dabei wird die Originaldatei an ihren
+        ursprünglichen Ort zurückverschoben.
+        Bei eigenen Cutlists werden nachdem Überprüfen einige Angaben abgefragt
+        zum Hochladen abgefragt.
+
+Konfigurationsdatei:
+    In der Konfigurationsdatei zur Verfügung stehenden Einstellungen (der
+    Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
+        cutdir=
+            Ausgabepfad [default: .]
+        uncutdir=
+            Ausgabepfad für alte Dateien [default: .]
+        virtualdub=
+            Pfad von vdub.exe [default: None]
+        avidemux_gui=
+            Befehl zum Ausführen einer Avidemux-Version mit GUI.
+            [default: avidemux2_qt4]
+        cachedir=
+            Pfad zu Cache [default: ~/.cache/mutlicut/]
+            Ein leerer Pfad bedeutet kein Cachen.
+        vorlauf=
+            Vorlauf bei der Überprüfung [default: 10]
+        nachlauf=
+            Nachlauf bei der Überprüfung [default: 5]
+        bewerten=
+            Gibt an, ob nach einer Wertung gefragt werden soll. [default:1]
+        cutname=
+            Ausdruck für Ausgabename (s.u.) [default: {{base}}-cut{{rating}}.{{ext}}]
+        uncutname=
+            Ausdruck für Ausgabename (s.u.) [default: {{full}}]
+        autor=
+            Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
+            wird.
+
+    Beschreibung der Sprache für die Namensgebung von Dateien:
+    (siehe auch cutname=, uncutname=)
+        {{base}}       Dateiname ohne Endung
+        {{ext}}        Dateiendung
+        {{shortext}}   Dateiendung ohne mpg.
+        {{rating}}     Bewertung der Cutlist *100
+        {{full}}       Der gesamte Dateiname
+"""
+
+prog_help = prog_help.format(VERSION=multicut_evolution_date)
 
 
 print "multicut_evolution.py Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
@@ -897,13 +917,16 @@ class CutOptions:
 	"""
 	defines options used throughout the program
 	"""
-	def __init__(self, configfile = None):
+	def __init__(self, configfile = None, cmd_options = {}):
 		# init values
 		self.tempdir = tempfile.mkdtemp(prefix = "multicut_evolution")
 		self.cutdir  = os.getcwd()
 		self.uncutdir= os.getcwd()
 		self.cachedir= os.path.expanduser("~/.cache/multicut_evolution/")
 		self.author  = pwd.getpwuid(os.getuid())[0]
+		self.only_internet = cmd_options["only_internet"] if "only_internet" in cmd_options else False
+		self.no_internet = cmd_options["no_internet"] if "no_internet" in cmd_options else False
+		
 		
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
@@ -960,13 +983,16 @@ class CutOptions:
 		print "Benutze als uncutnameformat: %s" % self.uncutnameformat
 		print "Benutze als AviDemux: %s (v:%s)" % (self.cmd_AviDemux, self.cmd_AviDemux_version)
 		print "Benutze als VirtualDub: %s" % self.cmd_VirtualDub
-		
-		self.cutlistprovider = {
-								'internet': CutListAT(self),
-								'own': 		CutListOwnProvider(self),
-								'file':		CutListFileProvider(self),
-							}
-		self.defaultproviderlist = ['internet','own']
+
+		self.cutlistprovider = {}
+		self.defaultproviderlist = []
+		if not self.no_internet:
+			self.cutlistprovider['internet'] = CutListAT(self)
+			self.defaultproviderlist.append('internet')
+		if not self.only_internet:
+			self.cutlistprovider['own']  = CutListOwnProvider(self)
+			self.cutlistprovider['file'] = CutListFileProvider(self)
+			self.defaultproviderlist.append('own')
 
 		self.DefaultProjectClass = AviDemuxProjectClass
 		self.RegisteredProjectClasses = {}
@@ -1069,6 +1095,8 @@ class CutFile:
 						print "Fehlgeschlagen, nehme nächsten..."
 						print #newline
 				else:
+					print "Es wurden keine weiteren Provider gefunden."
+					print "Datei wird nicht geschnitten, da keine Cutlist gefunden wurde."
 					raise StandardError("Could not find suitable provider...")
 					
 			inp = raw_input("Auswahl/Test: ").strip()
@@ -1328,7 +1356,9 @@ class VDProjectClass:
 ###
 def main():
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "nocheck","config=","verbosity="])
+		opts, args = getopt.getopt(sys.argv[1:], "hnio",
+						["help", "nocheck", "only_internet","no_internet", "offline",
+						"config=","verbosity="])
 	except getopt.GetoptError, err:
 		print C_RED + str(err) + C_CLEAR # will print something like "option -a not recognized"
 		print prog_help
@@ -1336,12 +1366,17 @@ def main():
 	
 	check_cut_files = True
 	configfile = "~/.multicut_evolution.conf"
-
+	cmd_options = {}
+	
 	for o, a in opts:
 		if o in ("-h", "--help"):
 			print prog_help
 			sys.exit()
-		elif o in ("--nocheck",):
+		elif o in ("-i", "--only_internet",):
+			cmd_options["only_internet"] = True
+		elif o in ("-o","no_internet", "offline",):
+			cmd_options["no_internet"] = True
+		elif o in ("-n", "--nocheck",):
 			check_cut_files = False
 		elif o in ("--config",):
 			configfile = a
@@ -1356,7 +1391,7 @@ def main():
 		print prog_help
 		sys.exit()
 	
-	o = CutOptions(configfile)
+	o = CutOptions(configfile,cmd_options)
 
 
 	###
@@ -1379,6 +1414,9 @@ def main():
 	print "%s Cutlists auswählen für insgesamt %d Datei(en): %s" %(C_RED_UNDERLINE, len(avis), C_CLEAR)
 	print
 	print "Verfügbare Provider:"
+	if len(o.cutlistprovider) == 0:
+		print "%sEs wurde kein Provider gefunden, überprüfen Sie ihre Parameter.%s" % (C_RED,C_CLEAR)
+		sys.exit()
 	for key, value in sorted(o.cutlistprovider.items(), key=lambda x:x[0]): #sort by name
 		std = " [default]" if key == o.defaultproviderlist[0] else ""
 		print "  %s - %s%s" % (key,value.desc,std)
@@ -1402,7 +1440,7 @@ def main():
 					if avi in cutfiles:
 						del cutfiles[avi]
 			except StandardError, e:
-				print "Ein Fehler ist aufgetreten:", e
+				pass
 		print
 		print
 		print "%s Cutlists umwählen: %s" %(C_RED, C_CLEAR)

@@ -38,6 +38,7 @@ C_CLEAR			= "\033[0m"
 C_RED			= "\033[41;37;1m"
 C_BLUE			= "\033[44;37;1m"
 C_RED_UNDERLINE	= "\033[41;37;1;4m"
+C_BRIGHT		= "\033[1m"
 
 multicut_evolution_date = "17.11.2010"
 prog_id = "multicut_evolution.py/%s" % multicut_evolution_date
@@ -47,12 +48,12 @@ prog_help = \
 """
 Hilfe für multicut_evolution.py ({VERSION}):
 
-multicut_evolution.py [--help] [--verbosity $d] [<andere Optionen>] $file1 ...
+multicut_evolution.py [--help] [--verbosity $d] [<andere Optionen>] $datei1 ...
 
 Die übergebenden Dateien werden anhand von auswählbaren Cutlists geschnitten.
-Dies geschieht in mehreren Phasen die weiter unten beschrieben werden.
+Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
 
-Optionen:
+{BOLD}Optionen{CLEAR}
     -h, --help
         Zeigt dise Hilfe an
 
@@ -76,7 +77,7 @@ Optionen:
         [default: 0, maximal 5]
 
 
-Ablauf:
+{BOLD}Ablauf{CLEAR}
     Phase 1 - Auswahl oder anlegen einer Cutlist
         Für jede angegebene Datei wird eine Cutlistübersichtsseite angegeben. Daraus
         kann man eine Cutlist auswählen, in dem man die Nummer eintippt und mit
@@ -113,10 +114,10 @@ Ablauf:
         angegeben, ob die geschnitte Datei gelöscht werden soll, was z.B. nach
         Fehlschnitten hilfreich ist. Dabei wird die Originaldatei an ihren
         ursprünglichen Ort zurückverschoben.
-        Bei eigenen Cutlists werden nachdem Überprüfen einige Angaben abgefragt
-        zum Hochladen abgefragt.
+        Bei eigenen Cutlists werden nachdem Überprüfen der einzelnen Schnitten
+        einige Angaben vor dem Hochladen abgefragt.
 
-Konfigurationsdatei:
+{BOLD}Konfigurationsdatei{CLEAR}
     In der Konfigurationsdatei zur Verfügung stehenden Einstellungen (der
     Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
         cutdir=
@@ -154,7 +155,7 @@ Konfigurationsdatei:
         {{full}}       Der gesamte Dateiname
 """
 
-prog_help = prog_help.format(VERSION=multicut_evolution_date)
+prog_help = prog_help.format(VERSION=multicut_evolution_date,BOLD=C_BRIGHT,CLEAR=C_CLEAR)
 
 
 print "multicut_evolution.py Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"

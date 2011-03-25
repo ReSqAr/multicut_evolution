@@ -21,7 +21,7 @@
 """
 
 import subprocess
-import os, shutil, codecs
+import os, shutil, codecs, pwd
 import time
 import random
 import tempfile
@@ -139,7 +139,7 @@ Beschreibung der Sprache für die Namensgebung von Dateien:
 
 print "multicut_evolution.py Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
 print "                                (C) 2010  Matthias Kümmerer"
-print "(URL: https://yhjz.de/public/gitweb/gitweb.cgi?p=multicut_evolution.git)"
+print "(URL: https://yhjz.de/public/fastforward/multicut_evolution)"
 print "This program comes with ABSOLUTELY NO WARRANTY."
 print
 
@@ -151,11 +151,11 @@ avidemux_cmds = ["avidemux2_cli", "avidemux_cli",
 				]
 
 search_request_expire_period = datetime.timedelta(hours=2)
-cutlist_expire_period = datetime.timedelta(days=14)
+cutlist_expire_period = datetime.timedelta(days=12)
 
-#
-# helper functions
-#
+###
+# Helper functions
+###
 def Debug(level, text):
 	if level <= VERBOSITY_LEVEL:
 		print "Debug (%d): %s" % (level,text)
@@ -193,10 +193,13 @@ def ParseII(ii):
 	a,step,b = int(a), int(step), int(b)
 	return range(a,b+1,step)
 
-#
-# Helper Class
-#
+###
+# Helper class
+###
 class FileCache:
+	"""
+	caches calls to getter
+	"""
 	def __init__(self, name, directory, getter, expireperiod=None, debug=lambda x:None):
 		self.name = name
 		self.directory = directory
@@ -289,9 +292,8 @@ class FileCache:
 	def updateContent(self, x, content):
 		uuid = hashlib.sha1(x).hexdigest()
 		
-		fname = self.getFileName(uuid)
-		
 		if uuid in self.fileCache:
+			fname = self.getFileName(uuid)
 			codecs.open(fname, 'w', 'utf8').write(content)
 		else:
 			self.appendFileCache(uuid, content)
@@ -324,10 +326,14 @@ class FileCache:
 		return content
 
 
-#
+###
 # CutList Class
-#
+###
 class CutList:
+	"""
+	encapsulates a cutlist (with some metainformation) and some common operations,
+	like viewing cutlist and showing metadata
+	"""
 	def __init__(self, cutlistprov, cutlist=None, cutlist_dict=None):
 		self.cutlistprov = cutlistprov
 		
@@ -495,10 +501,13 @@ class CutList:
 		self.cutlistprov.PostProcessCutList( self.attr["id"] )
 
 
-#
+###
 # CutListAT as CutlistProviderClass
-#
+###
 class CutListAT:
+	"""
+	Wrapper for cutlist.at
+	"""
 	def __init__(self, cutoptions):
 		self.opener = urllib2.build_opener()
 		self.opener.addheaders = [ ('User-agent', prog_id)]
@@ -544,13 +553,16 @@ class CutListAT:
 				print "Hole Übersicht von cutlist.at..."
 				self.cutlists = prov.ListAll(filename)
 				print "%d Cutlist(s) gefunden" % len(self.cutlists)
-				print
+
+				if len(self.cutlists) == 0:
+					raise LookupError()
 				
 				self.cutlists.sort(key =  lambda x: -float(x['metarating']))
 
+				print
 				for i, cutlist in enumerate(self.cutlists):
 					print cutlist.CutListToConsoleText(i+1)
-			
+
 			def getCutlist(self, inp, **kwargs):
 				try:
 					i = int(inp)-1
@@ -599,11 +611,14 @@ class CutListAT:
 				except:
 					print "Illegale Eingabe"
 
-	
-#
+
+###
 # CutListOwnProvider
-#
+###
 class CutListOwnProvider:
+	"""
+	allows creation of cutlists
+	"""
 	def __init__(self, cutoptions):
 		self.cutoptions = cutoptions
 		self.desc = "Eigene Cutlists erstellen."
@@ -620,8 +635,10 @@ class CutListOwnProvider:
 	def addCutlist(self, filename, cutlist):
 		precutlists = self.cutlistCache.get(filename)
 		precutlists = precutlists.split(self.delimiter) if precutlists else []
+
+		comment = datetime.datetime.now().strftime("%H:%M:%S am %d.%m.%Y")
 		
-		addcutlist = "%s\n%s" % (datetime.datetime.now().strftime("%H:%M:%S am %d.%m.%Y"), cutlist)
+		addcutlist = "%s\n%s" % (comment, cutlist)
 		
 		precutlists.append(addcutlist)
 		self.cutlistCache.updateContent(filename, self.delimiter.join(precutlists))
@@ -630,7 +647,7 @@ class CutListOwnProvider:
 		cutlist = CutListGenerator(self).makeCutList(path)
 		if cutlist:
 			self.addCutlist(os.path.basename(path), cutlist)
-			return CutList(self,cutlist_dict={'id':cutlist}) #full abuse
+			return CutList(self,cutlist_dict={'id':cutlist}) #full abuse, but it's ok... (but no metadata available)
 		else:
 			return None
 		
@@ -639,8 +656,7 @@ class CutListOwnProvider:
 	
 	def UploadCutList(self, cutlist):
 		print "Cutlist zum Hochladen:"
-		lines = cutlist.split('\n')
-		fname = [line for line in lines if line.startswith("ApplyToFile=")]
+		fname = [line for line in cutlist.split('\n') if line.startswith("ApplyToFile=")]
 		if len(fname) != 1:
 			print "Illegale Cutlist, uploaden nicht möglich."
 			return
@@ -661,7 +677,7 @@ class CutListOwnProvider:
 		class View:
 			def __init__(self):
 				self.cutlists = prov.getCutlists(filename)
-				print "%d Cutlist(s) gefunden" % len(self.cutlists)
+				print "%d Cutlist(s) wurden schon von Ihnen erstellt" % len(self.cutlists)
 
 				for i, cutlist in enumerate(self.cutlists):
 					print "[%2d] Cutlist: %s" % (i+1,cutlist[0])
@@ -694,10 +710,11 @@ class CutListOwnProvider:
 		print "Hochladen von Cutlists noch nicht implementiert."
 		return
 		
+		cutlist = self.GetCutList(cl_id)
 		
-		attr = [	# display				internal  			default
+		attr = [	# display				internal  			(initial) value
 					['Autor',  				'Author', 			self.cutoptions.author],
-					['Ihre Bewertung', 	'RatingByAuthor', 	''],
+					['Ihre Bewertung', 		'RatingByAuthor', 	''],
 					['Kommentar',			'UserComment',		''],
 					['Filmnamensvorschlag', 'SuggestedMovieName',''],
 				]
@@ -710,8 +727,8 @@ class CutListOwnProvider:
 		
 		while True:
 			for did in attr:
-				display, _, default = did
-				s = raw_input("%s[%s]: " % (display, default)).strip()
+				display, _, value = did
+				s = raw_input("%s[%s]: " % (display, value)).strip()
 				if s.lower() == 'clear':
 					did[2] = ''
 				elif s:
@@ -719,7 +736,7 @@ class CutListOwnProvider:
 			
 			infotxt = \
 				'[Info]\n'\
-				+ ''.join( ["%s=%s\n" % (internal, default) for _, internal, default in attr] ) \
+				+ ''.join( ["%s=%s\n" % (internal, value) for _, internal, value in attr] ) \
 				+ 'EPGError=%s\n' % ""\
 				+ 'ActualContent=%s\n' % ""\
 				+ 'MissingBeginning=%s\n' % ""\
@@ -739,14 +756,17 @@ class CutListOwnProvider:
 				continue
 			else:
 				break
-			
-		self.UploadCutList("%s\n%s" % (cl_id, infotxt))
+		
+		self.UploadCutList("%s\n%s" % (cutlist, infotxt))
 
 
-#
+###
 # CutListFileProvider
-#
+###
 class CutListFileProvider:
+	"""
+	allows local cutlists
+	"""
 	def __init__(self, cutoptions):
 		self.cutoptions = cutoptions
 		self.desc = "Cutlists von der Festplatte benutzen."
@@ -776,10 +796,13 @@ class CutListFileProvider:
 	#
 	def PostProcessCutList( self, cl_id ):
 		pass
-#
+###
 # CutListGenerator
-#
+###
 class CutListGenerator:
+	"""
+	generates cutlists
+	"""
 	def __init__(self, cutlistprov):
 		self.cutlistprov = cutlistprov
 	
@@ -867,17 +890,20 @@ class CutListGenerator:
 
 		
 
-#
+###
 # CutOptions Class
-#
+###
 class CutOptions:
+	"""
+	defines options used throughout the program
+	"""
 	def __init__(self, configfile = None):
 		# init values
 		self.tempdir = tempfile.mkdtemp(prefix = "multicut_evolution")
 		self.cutdir  = os.getcwd()
 		self.uncutdir= os.getcwd()
 		self.cachedir= os.path.expanduser("~/.cache/multicut_evolution/")
-		self.author  = "Mr Wayne"
+		self.author  = pwd.getpwuid(os.getuid())[0]
 		
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
@@ -940,7 +966,7 @@ class CutOptions:
 								'own': 		CutListOwnProvider(self),
 								'file':		CutListFileProvider(self),
 							}
-		self.defaultprovider = 'internet'
+		self.defaultproviderlist = ['internet','own']
 
 		self.DefaultProjectClass = AviDemuxProjectClass
 		self.RegisteredProjectClasses = {}
@@ -1011,10 +1037,13 @@ class CutOptions:
 		raise ValueError("'%s' is not valid" % name)
 
 
-#
+###
 # CutFile Class
-#
+###
 class CutFile:
+	"""
+	select cutlist and cut file
+	"""
 	def __init__(self, path, cutoptions):
 		self.path = os.path.realpath(path)
 		self.cutoptions = cutoptions
@@ -1031,8 +1060,17 @@ class CutFile:
 		
 		while not self.cutlist:
 			if not self.currentprov:
-				self.currentprov = self.cutoptions.cutlistprovider[self.cutoptions.defaultprovider].getView(self.path)
-			
+				for prov in self.cutoptions.defaultproviderlist:
+					try:
+						print "Wähle automatisch den Provider '%s'" % prov
+						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path)
+						break
+					except LookupError:
+						print "Fehlgeschlagen, nehme nächsten..."
+						print #newline
+				else:
+					raise StandardError("Could not find suitable provider...")
+					
 			inp = raw_input("Auswahl/Test: ").strip()
 			print
 			
@@ -1050,7 +1088,7 @@ class CutFile:
 					if inp.startswith(prov.lower()):
 						inp = inp[len(prov):]
 						
-						print "Providerwechsel nach '%s'" % prov
+						print "Wechsel zu Provider '%s'" % prov
 						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path)
 						break
 				else:
@@ -1071,7 +1109,7 @@ class CutFile:
 		return True
 
 
-	def Cut(self):		
+	def Cut(self):
 		self.cutname = self.cutoptions.FormatString("cutname",   (self.cutlist, self.filename))
 		self.tmpname = "$$$$-" + self.cutname 
 		self.uncutname = self.cutoptions.FormatString("uncutname", (self.cutlist, self.filename))
@@ -1135,10 +1173,13 @@ class CutFile:
 		return "4:3"
 		
 
-#
+###
 # AviDemuxProjectClass
-#
+###
 class AviDemuxProjectClass:
+	"""
+	avidemux project wrapper
+	"""
 	def __init__(self, cutfile, cutlist, cutoptions):
 		self.cutoptions = cutoptions
 		self.filename = self.cutoptions.tempdir + "%d_project.js" % random.getrandbits(32)
@@ -1204,10 +1245,13 @@ class AviDemuxProjectClass:
 		Debug(1, "starting avidemux")
 		return Run(self.cutoptions.cmd_AviDemux, ["--force-smart", "--run", self.filename, "--quit"])
 
-#
+###
 # VDProjectClass
-#
+###
 class VDProjectClass:
+	"""
+	VD project wrapper
+	"""
 	def __init__(self, cutfile, cutlist, cutoptions):
 		self.cutoptions = cutoptions
 		self.projectname = "%d_project.syl" % random.getrandbits(32)
@@ -1279,6 +1323,9 @@ class VDProjectClass:
 				break
 
 
+###
+# main function
+###
 def main():
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "nocheck","config=","verbosity="])
@@ -1333,7 +1380,7 @@ def main():
 	print
 	print "Verfügbare Provider:"
 	for key, value in sorted(o.cutlistprovider.items(), key=lambda x:x[0]): #sort by name
-		std = " [default]" if key == o.defaultprovider else ""
+		std = " [default]" if key == o.defaultproviderlist[0] else ""
 		print "  %s - %s%s" % (key,value.desc,std)
 	print
 	print
@@ -1347,12 +1394,15 @@ def main():
 		print
 		
 		for avi in avis2Choose:
-			c = CutFile(avi, o)
-			if c.ChooseCutList():
-				cutfiles[avi] = c
-			else:
-				if avi in cutfiles:
-					del cutfiles[avi]
+			try:
+				c = CutFile(avi, o)
+				if c.ChooseCutList():
+					cutfiles[avi] = c
+				else:
+					if avi in cutfiles:
+						del cutfiles[avi]
+			except StandardError, e:
+				print "Ein Fehler ist aufgetreten:", e
 		print
 		print
 		print "%s Cutlists umwählen: %s" %(C_RED, C_CLEAR)

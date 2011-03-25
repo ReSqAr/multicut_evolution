@@ -37,6 +37,7 @@ import ast
 C_CLEAR			= "\033[0m"
 C_RED			= "\033[41;37;1m"
 C_BLUE			= "\033[44;37;1m"
+C_BLACK			= "\033[40;37;1m"
 C_RED_UNDERLINE	= "\033[41;37;1;4m"
 C_BOLD			= "\033[1m"
 
@@ -115,7 +116,8 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         Fehlschnitten hilfreich ist. Dabei wird die Originaldatei an ihren
         ursprünglichen Ort zurückverschoben.
         Bei eigenen Cutlists werden nachdem Überprüfen der einzelnen Schnitten
-        einige Angaben vor dem Hochladen abgefragt.
+        einige Angaben vor dem Hochladen abgefragt. Allerdings ist Hochladen nur
+        möglich, wenn der Cutlist.at-Benutzerhash angegeben wurde.
 
 {BOLD}Konfigurationsdatei{CLEAR}
     In der Konfigurationsdatei zur Verfügung stehenden Einstellungen (der
@@ -145,8 +147,8 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         autor=
             Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
             wird.
-        cutlistatuser=
-            Cutlist.at-Benutzername. [default: leer]
+        cutlistathash=
+            Cutlist.at-Benutzerhash. [default: leer]
 
     Beschreibung der Sprache für die Namensgebung von Dateien:
     (siehe auch cutname=, uncutname=)
@@ -455,14 +457,14 @@ class CutList:
 		outtxt =  \
 		  "@RED %s @CLEAR	Schnitte:  @BLUE %s @CLEAR (%s)	Spielzeit: @BLUE %s @CLEAR (hh:mm:ss)\n" % \
 													(number, cuts, cutsformat, duration) \
-		+ "%s	Bewertung: @BLUE %s (%s/%s) @CLEAR    	Autor:     @BLUE %s (%s) @CLEAR\n" \
+		+ "@BLACK%s@CLEAR	Bewertung: @BLUE %s (%s/%s) @CLEAR    	Autor:     @BLUE %s (%s) @CLEAR\n" \
 				% (self.attr["metarating"], rating, self.attr["ratingcount"], self.attr["downloadcount"], 
 																			author, self.attr["ratingbyauthor"])\
 		+ errorline
 		if self.attr["usercomment"]:
 			outtxt += "	Kommentar: @BLUE %s @CLEAR\n" % self.attr["usercomment"]
 		
-		return outtxt.replace("@BLUE", C_BLUE).replace("@RED", C_RED).replace("@CLEAR", C_CLEAR)
+		return outtxt.replace("@BLUE",C_BLUE).replace("@RED",C_RED).replace("@CLEAR",C_CLEAR).replace("@BLACK",C_BLACK)
 		
 	def ShowCuts(self, path, is_filecut, tempdir):
 		fps = self.GetFPS()
@@ -542,9 +544,9 @@ class CutListAT:
 								search_request_expire_period, lambda x: Debug(2, x))
 
 	def Get(self, url, user=False):
-		username = self.cutoptions.cutlistatuser
-		if user and username:
-			url = "http://www.cutlist.at/user/%s/%s" % (username,url)
+		userhash = self.cutoptions.cutlistathash
+		if user and userhash:
+			url = "http://www.cutlist.at/user/%s/%s" % (userhash,url)
 		else:
 			url = "http://www.cutlist.at/%s" % url
 		Debug(4,"get url: %s"%url)
@@ -680,21 +682,7 @@ class CutListOwnProvider:
 		
 	def GetCutList(self, cl_id):
 		return cl_id
-	
-	def UploadCutList(self, cutlist):
-		print "Cutlist zum Hochladen:"
-		fname = [line for line in cutlist.split('\n') if line.startswith("ApplyToFile=")]
-		if len(fname) != 1:
-			print "Illegale Cutlist, uploaden nicht möglich."
-			return
-		fname = fname[0][len("ApplyToFile="):].strip()
-		
-		print fname
-		print
-		print cutlist
-		print
-		print "Hochladen noch nicht implementiert."
-	
+
 	#
 	# getView
 	#
@@ -734,11 +722,15 @@ class CutListOwnProvider:
 	# upload cutlist
 	#
 	def PostProcessCutList( self, cl_id ):
-		print "Hochladen von Cutlists noch nicht implementiert."
-		return
+		if not self.cutoptions.cutlistathash:
+			print "Kein Cutlist.at-Benutzerhash angegeben, daher kann die Cutlist nicht hochgeladen werden."
+			return
 		
+		s = raw_input("Cutlist hochladen [J/n]: ").strip()
+		if 'n' in s.lower():
+			return
+
 		cutlist = self.GetCutList(cl_id)
-		
 		attr = [	# display				internal  			(initial) value
 					['Autor',  				'Author', 			self.cutoptions.author],
 					['Ihre Bewertung', 		'RatingByAuthor', 	''],
@@ -746,12 +738,7 @@ class CutListOwnProvider:
 					['Filmnamensvorschlag', 'SuggestedMovieName',''],
 				]
 		
-		s = raw_input("Cutlist hochladen [J/n]: ").strip()
-		if 'n' in s.lower():
-			return
-		
 		print
-		
 		while True:
 			for did in attr:
 				display, _, value = did
@@ -760,6 +747,8 @@ class CutListOwnProvider:
 					did[2] = ''
 				elif s:
 					did[2] = s
+				else:
+					pass
 			
 			infotxt = \
 				'[Info]\n'\
@@ -786,6 +775,52 @@ class CutListOwnProvider:
 		
 		self.UploadCutList("%s\n%s" % (cutlist, infotxt))
 
+	def UploadCutList(self, cutlist):
+		print "Cutlist zum Hochladen:"
+		fname = [line for line in cutlist.split('\n') if line.startswith("ApplyToFile=")]
+		if len(fname) != 1:
+			print "Illegale Cutlist, uploaden nicht möglich."
+			return
+		fname = fname[0][len("ApplyToFile="):].strip()
+
+		opener = urllib2.build_opener()
+		opener.addheaders = [ ('User-agent', prog_id)]
+
+		#
+		# credit to: Benjamin Elbers
+		# (https://github.com/elbersb/otr-verwaltung/blob/347bffee4c4f9db52ac715790be5a05d98801d30/otrverwaltung/cutlists.py)
+		#
+		boundary = '$$$$boundary$$$$d52f909eb7bab6a825d0386c7072a6ae69fe14cb$$$$'
+		headers = { 'Content-Type': 'multipart/form-data; boundary=%s' % boundary }
+		lines = [
+			'--' + boundary,
+			'Content-Disposition: form-data; name="userid"',
+			'',
+			self.cutoptions.cutlistathash,
+			'--' + boundary,
+			'Content-Disposition: form-data; name="userfile[]"; filename="%s"' % (fname + '.cutlist'),
+			'',
+			cutlist,
+			'--' + boundary + '--',
+			'']
+
+		body = '\r\n'.join(lines)
+		Debug(4,"upload body:\n%s"%(url,body))
+
+		server = "www.cutlist.at"
+		connection = httplib.HTTPConnection(server)
+		headers = { 'Content-Type': 'multipart/form-data; boundary=%s' % boundary }
+
+		try:
+			connection.request('POST', server + "index.php?upload=2", body, headers)
+		except Exception, error_message:
+			print "Upload ist fehlgeschlagen: %s" % error_message
+
+		response = connection.getresponse().read()
+		if 'erfolgreich' in response:
+			print "Upload war erfolgreich"
+		else:
+			print "Upload ist fehlgeschlagen: %s" % response
 
 ###
 # CutListFileProvider
@@ -933,7 +968,7 @@ class CutOptions:
 		self.author  = pwd.getpwuid(os.getuid())[0]
 		self.only_internet = cmd_options["only_internet"] if "only_internet" in cmd_options else False
 		self.no_internet = cmd_options["no_internet"] if "no_internet" in cmd_options else False
-		self.cutlistatuser = ""
+		self.cutlistathash = ""
 		
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
@@ -1044,8 +1079,8 @@ class CutOptions:
 						self.do_rate = int(opt)
 					elif cmd == "autor":
 						self.author = opt
-					elif cmd == "cutlistatuser":
-						self.cutlistatuser = opt
+					elif cmd == "cutlistathash":
+						self.cutlistathash = opt
 					
 				except StandardError, e:
 					print "ConfigParse: Could not parse '%s' due to:" % line

@@ -38,9 +38,9 @@ C_CLEAR			= "\033[0m"
 C_RED			= "\033[41;37;1m"
 C_BLUE			= "\033[44;37;1m"
 C_RED_UNDERLINE	= "\033[41;37;1;4m"
-C_BRIGHT		= "\033[1m"
+C_BOLD			= "\033[1m"
 
-multicut_evolution_date = "17.11.2010"
+multicut_evolution_date = "25.03.2010"
 prog_id = "multicut_evolution.py/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
@@ -145,6 +145,8 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         autor=
             Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
             wird.
+        cutlistatuser=
+            Cutlist.at-Benutzername. [default: leer]
 
     Beschreibung der Sprache für die Namensgebung von Dateien:
     (siehe auch cutname=, uncutname=)
@@ -153,9 +155,7 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         {{shortext}}   Dateiendung ohne mpg.
         {{rating}}     Bewertung der Cutlist *100
         {{full}}       Der gesamte Dateiname
-"""
-
-prog_help = prog_help.format(VERSION=multicut_evolution_date,BOLD=C_BRIGHT,CLEAR=C_CLEAR)
+""".format(VERSION=multicut_evolution_date,BOLD=C_BOLD,CLEAR=C_CLEAR)
 
 
 print "multicut_evolution.py Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
@@ -355,17 +355,17 @@ class CutList:
 	encapsulates a cutlist (with some metainformation) and some common operations,
 	like viewing cutlist and showing metadata
 	"""
-	def __init__(self, cutlistprov, cutlist=None, cutlist_dict=None):
+	def __init__(self, cutlistprov, cutlist_meta_xml=None, cutlist_meta_dict=None):
 		self.cutlistprov = cutlistprov
 		
-		if cutlist:
+		if cutlist_meta_xml:
 			#tags:
 			# 'id', 'name', 'rating', 'ratingcount', 'author', 'ratingbyauthor', 'actualcontent', 'usercomment', 'cuts', 'filename', 
 			# 'filename_original', 'autoname', 'withframes', 'withtime', 'duration', 'errors', 'othererrordescription', 'downloadcount'
-			tagvalues = re.findall("<(?P<tag>.*?)>\s*(?P<value>.*?)\s*</(?P=tag)>", cutlist, re.DOTALL) #python is so cool
+			tagvalues = re.findall("<(?P<tag>.*?)>\s*(?P<value>.*?)\s*</(?P=tag)>", cutlist_meta_xml, re.DOTALL) #python is so cool
 			self.attr = dict(tagvalues)
-		elif cutlist_dict:
-			self.attr = dict(cutlist_dict)
+		elif cutlist_meta_dict:
+			self.attr = dict(cutlist_meta_dict)
 		else:
 			raise ValueError("CutList was called with illegal arguments.")
 		
@@ -541,8 +541,14 @@ class CutListAT:
 		self.searchCache = FileCache("search", cutoptions.cachedir, self._GetSearchList,
 								search_request_expire_period, lambda x: Debug(2, x))
 
-	def Get(self, url):
-		return self.opener.open("http://www.cutlist.at/" + url).read()
+	def Get(self, url, user=False):
+		username = self.cutoptions.cutlistatuser
+		if user and username:
+			url = "http://www.cutlist.at/user/%s/%s" % (username,url)
+		else:
+			url = "http://www.cutlist.at/%s" % url
+		Debug(4,"get url: %s"%url)
+		return self.opener.open(url).read()
 		
 	def _GetSearchList(self, filename):
 		url = "getxml.php?name=%s&version=0.9.8.0" % filename
@@ -550,18 +556,18 @@ class CutListAT:
 	def ListAll(self, filename):
 		xml = self.searchCache.get(filename)
 		cutlists = re.findall('<cutlist row_index="\\d">.*?</cutlist>', xml, re.DOTALL)		
-		return [CutList(self,cutlist) for cutlist in cutlists]
+		return [CutList(self,cutlist_meta_xml=cutlist) for cutlist in cutlists]
 	
 	def _GetCutList(self, cl_id):
 		url = "getfile.php?id=%s" % cl_id
-		return unicode(self.Get(url), "iso-8859-1")
+		return unicode(self.Get(url,user=True), "iso-8859-1")
 	def GetCutList(self, cl_id):
 		return self.cutlistCache.get(cl_id)
 	
 	def RateCutList(self, cl_id, rating):
 		Debug(2, "rate cutlist %s with %d" % (cl_id, rating))
 		url = "rate.php?rate=%s&rating=%d" % (cl_id, rating)
-		return self.Get(url)
+		return self.Get(url,user=True)
 	
 	#
 	# getView
@@ -651,7 +657,7 @@ class CutListOwnProvider:
 		precutlists = self.cutlistCache.get(filename)
 		precutlists = precutlists.split(self.delimiter) if precutlists else []
 		precutlists = [ cutlist.split('\n',1) for cutlist in precutlists ]
-		return [ (comment, CutList(self,cutlist_dict={'id':precutlist})) for comment, precutlist in precutlists ]
+		return [ (comment, CutList(self,cutlist_meta_dict={'id':precutlist})) for comment, precutlist in precutlists ]
 	
 	def addCutlist(self, filename, cutlist):
 		precutlists = self.cutlistCache.get(filename)
@@ -668,7 +674,7 @@ class CutListOwnProvider:
 		cutlist = CutListGenerator(self).makeCutList(path)
 		if cutlist:
 			self.addCutlist(os.path.basename(path), cutlist)
-			return CutList(self,cutlist_dict={'id':cutlist}) #full abuse, but it's ok... (but no metadata available)
+			return CutList(self,cutlist_meta_dict={'id':cutlist}) #full abuse, but it's ok... (but no metadata available)
 		else:
 			return None
 		
@@ -806,7 +812,7 @@ class CutListFileProvider:
 			
 			def getCutlist(self, inp, **kwargs):
 				if os.path.isfile(inp):
-					return CutList(prov,cutlist_dict={'id':inp})
+					return CutList(prov,cutlist_meta_dict={'id':inp})
 				else:
 					print "'%s' ist keine gültige Datei." % inp
 					return None
@@ -927,7 +933,7 @@ class CutOptions:
 		self.author  = pwd.getpwuid(os.getuid())[0]
 		self.only_internet = cmd_options["only_internet"] if "only_internet" in cmd_options else False
 		self.no_internet = cmd_options["no_internet"] if "no_internet" in cmd_options else False
-		
+		self.cutlistatuser = ""
 		
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
@@ -1038,6 +1044,8 @@ class CutOptions:
 						self.do_rate = int(opt)
 					elif cmd == "autor":
 						self.author = opt
+					elif cmd == "cutlistatuser":
+						self.cutlistatuser = opt
 					
 				except StandardError, e:
 					print "ConfigParse: Could not parse '%s' due to:" % line

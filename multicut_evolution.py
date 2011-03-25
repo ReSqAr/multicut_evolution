@@ -22,6 +22,7 @@
 
 import subprocess
 import os, shutil, codecs, pwd
+import httplib
 import time
 import random
 import tempfile

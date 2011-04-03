@@ -783,19 +783,21 @@ class CutListOwnProvider:
 			print infotxt
 			print
 			
-			s = raw_input("Cutlist annehmen/anzeigen [J/n/a]: ").strip()
+			s = raw_input("Cutlist annehmen (oder anzeigen) [J/n/a(nzeigen)]: ").strip()
 			if 'a' in s.lower():
-				print "%s\n%s" % (cutlist, infotxt)
+				print "Cutlist:"
+				for line in ("%s\n%s" % (infotxt, cutlist)).split('\n'):
+					print ">", line
+				print
 				continue
 			elif 'n' in s.lower():
 				continue
 			else:
 				break
 		
-		self.UploadCutList("%s\n%s" % (cutlist, infotxt))
+		self.UploadCutList("%s\n%s" % (infotxt, cutlist))
 
 	def UploadCutList(self, cutlist):
-		print "Cutlist zum Hochladen:"
 		fname = [line for line in cutlist.split('\n') if line.startswith("ApplyToFile=")]
 		if len(fname) != 1:
 			print "Illegale Cutlist, uploaden nicht möglich."
@@ -824,7 +826,7 @@ class CutListOwnProvider:
 			'']
 
 		body = '\r\n'.join(lines)
-		Debug(4,"upload body:\n%s"%(url,body))
+		Debug(4,"upload body:\n%s" % body)
 
 		server = "www.cutlist.at"
 		connection = httplib.HTTPConnection(server)
@@ -832,12 +834,13 @@ class CutListOwnProvider:
 
 		try:
 			connection.request('POST', server + "index.php?upload=2", body, headers)
-		except Exception, error_message:
-			print "Upload ist fehlgeschlagen: %s" % error_message
+		except Exception, e:
+			print "Upload ist fehlgeschlagen: %s" % e
 
 		response = connection.getresponse().read()
 		if 'erfolgreich' in response:
 			print "Upload war erfolgreich"
+			Debug(2,"Server-Antwort: %s" % response)
 		else:
 			print "Upload ist fehlgeschlagen: %s" % response
 
@@ -961,11 +964,11 @@ class CutListGenerator:
 		for cut, segment in enumerate(segments):
 			start    = segment.split(',')[1]
 			duration = segment.split(',')[2].split(')')[0]
-			cstr += '[Cut%s]\n' % cut\
+			cstr += '\n[Cut%s]\n' % cut\
 				+ 'Start=%f\n' % (float(start)/self.FPS) \
 				+ 'StartFrame=%s\n' %start\
 				+ 'Duration=%f\n' % (float(duration)/self.FPS) \
-				+ 'DurationFrames=%s\n\n' % duration
+				+ 'DurationFrames=%s\n' % duration
 		
 		return cstr
 
@@ -1169,7 +1172,7 @@ class CutFile:
 				print "Datei wird nicht geschnitten"
 				return False
 			
-			doTest = False
+			specials = []
 			
 			# consume input string
 			while inp.strip():
@@ -1183,19 +1186,28 @@ class CutFile:
 						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path)
 						break
 				else:
-					if inp.lower().startswith('test'):
-						doTest = True
-						inp = inp[len('test'):]
+					for flag in ['test', 'cat']:
+						if inp.lower().startswith(flag):
+							specials.append(flag)
+							inp = inp[len(flag):]
+							break
 					else:
 						data, _, inp = inp.partition(' ')
 						self.cutlist = self.currentprov.getCutlist(data, currentcutlist = self.cutlist)
-			
-			if doTest:
+
+			if specials:
 				if self.cutlist:
-					self.cutlist.ShowCuts(self.path, is_filecut = False, tempdir = self.cutoptions.tempdir)
+					if 'test' in specials:
+						self.cutlist.ShowCuts(self.path, is_filecut = False, tempdir = self.cutoptions.tempdir)
+					if 'cat' in specials:
+						cutlist = self.cutlist.GetCutList()
+						print "Cutlist:"
+						for line in cutlist.split('\n'):
+							print ">", line
+						print
 					self.cutlist = None
 				else:
-					print "Keine Cutlist angegeben zum Testen!"
+					print "Keine Cutlist angegeben!"
 
 		return True
 
@@ -1503,7 +1515,7 @@ def main():
 					if avi in cutfiles:
 						del cutfiles[avi]
 			except StandardError, e:
-				pass
+				print "Ein Fehler ist aufgetreten, die Datei wird nicht geschnitten: %s" % e
 		print
 		print
 		print "%s Cutlists umwählen: %s" % (C_RED, C_CLEAR)

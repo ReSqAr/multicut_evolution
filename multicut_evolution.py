@@ -401,28 +401,28 @@ class CutList:
 
 	def GetFPS(self):
 		cutlisttxt = self.GetCutList()
-		return float( re.search("FramesPerSecond=(?P<value>[0-9.]*)", cutlisttxt).group('value') )
+		return float( re.search("FramesPerSecond=(?P<value>[-0-9.]*)", cutlisttxt).group('value') )
 
 	def TimesInFrames(self):
 		cutlisttxt = self.GetCutList()
 		if "\nStartFrame" in cutlisttxt:
-			StartInFrames = re.findall("StartFrame=(?P<value>[0-9]*)", cutlisttxt)
+			StartInFrames = re.findall("StartFrame=(?P<value>[-0-9]*)", cutlisttxt)
 			StartInFrames = [int(d) for d in StartInFrames]
-			DurationInFrames= re.findall("DurationFrames=(?P<value>[0-9]*)", cutlisttxt)
+			DurationInFrames= re.findall("DurationFrames=(?P<value>[-0-9]*)", cutlisttxt)
 			DurationInFrames = [int(d) for d in DurationInFrames]
 		else:
 			fps = self.GetFPS()
-			Start = re.findall("Start=(?P<value>[0-9.]*)", cutlisttxt)
+			Start = re.findall("Start=(?P<value>[-0-9.]*)", cutlisttxt)
 			StartInFrames = [int( float(d) * fps + 0.5 ) for d in Start]
-			Duration = re.findall("Duration=(?P<value>[0-9.]*)", cutlisttxt)
+			Duration = re.findall("Duration=(?P<value>[-0-9.]*)", cutlisttxt)
 			DurationInFrames = [int( float(d) * fps + 0.5 ) for d in Duration]
 		return StartInFrames, DurationInFrames
 	
 	def TimesInSeconds(self):
 		cutlisttxt = self.GetCutList()
-		Start = re.findall("Start=(?P<value>[0-9.]*)", cutlisttxt)
+		Start = re.findall("Start=(?P<value>[-0-9.]*)", cutlisttxt)
 		Start = [float(d) for d in Start]
-		Duration = re.findall("Duration=(?P<value>[0-9.]*)", cutlisttxt)
+		Duration = re.findall("Duration=(?P<value>[-0-9.]*)", cutlisttxt)
 		Duration = [float(d) for d in Duration]
 		return Start, Duration
 
@@ -1183,7 +1183,7 @@ class CutFile:
 
 
 	def Cut(self):
-		self.cutname = self.cutoptions.FormatString("cutname",   (self.cutlist, self.filename))
+		self.cutname = self.cutoptions.FormatString("cutname", (self.cutlist, self.filename))
 		self.tmpname = "$$$$-" + self.cutname 
 		self.uncutname = self.cutoptions.FormatString("uncutname", (self.cutlist, self.filename))
 		
@@ -1488,7 +1488,7 @@ def main():
 				pass
 		print
 		print
-		print "%s Cutlists umwählen: %s" %(C_RED, C_CLEAR)
+		print "%s Cutlists umwählen: %s" % (C_RED, C_CLEAR)
 		print
 		# confirm selection
 		for i,avi in enumerate(avis):
@@ -1550,10 +1550,17 @@ def main():
 	
 	try:
 		if errors:
+			print
+			print
+			print
+			print "%s Es sind Fehler aufgetreten %s" % (C_RED, C_CLEAR)
+			print
 			for e,c in errors:
-				print 70*'#'
-				print c.filename
-				print e
+				print "Datei:", c.filename
+				print "Fehler:", e
+				#try:	print c.cutlist.GetCutList()
+				#except Exception, e: print "Cutliste kann nicht angezeigt werden, wegen: '%s'" % e
+				print
 	except:
 		print "Fehler während dem Anzeigen von Fehlern..."
 		

@@ -147,9 +147,10 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
             Ausdruck für Ausgabename (s.u.) [default: {{full}}]
         autor=
             Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
-            wird.
+            wird. [default: Terminalbenutzername]
         cutlistathash=
-            Cutlist.at-Benutzerhash. [default: leer]
+            Cutlist.at-Benutzerhash, also nicht die gesamte URL sondern nur den Hash
+            [default: leer]
 
     Beschreibung der Sprache für die Namensgebung von Dateien:
     (siehe auch cutname=, uncutname=)
@@ -379,7 +380,7 @@ class CutList:
 			def ToF(a, default):
 				try:	return float(a)
 				except:	return default
-			self.attr["metarating"] = ToF(self.attr['rating'],-1) \
+			self.attr["metarating"] = ToF(self.attr['rating'],0) \
 									+ ToF(self.attr['ratingbyauthor'],-1) \
 									+ ToF(self.attr['ratingcount'],0)/50 \
 									+ ToF(self.attr['downloadcount'],0)/1000
@@ -455,6 +456,8 @@ class CutList:
 			except:
 				pass
 		
+		meta = ("%.4g" % self.attr["metarating"]).ljust(5)
+		
 		if self.attr["errors"] != "000000":
 			errortext = ["Anfang fehlt!", "Ende fehlt!", "Video!", "Audio!", "Fehler: %s" % self.attr["othererrordescription"], "EPG"]
 			errors = []
@@ -464,14 +467,16 @@ class CutList:
 			errorline = "	Fehler:    @RED %s @CLEAR\n" % " ".join(errors)
 		else:
 			errorline = ""
+
+		outtxt = \
+			("@RED {n} @CLEAR	Schnitte:  @BLUE {cuts} @CLEAR ({cutsformat})	Spielzeit: @BLUE {duration} @CLEAR (hh:mm:ss)\n" \
+			+ "@BLACK{meta}@CLEAR	Bewertung: @BLUE {rating} ({c}/{dl}) @CLEAR    	Autor:     @BLUE {author} ({arating}) @CLEAR\n").format(
+					n=number, cuts=cuts, cutsformat=cutsformat, duration=duration,
+						meta=meta, rating=rating, c=self.attr["ratingcount"], dl=self.attr["downloadcount"], 
+						author=author, arating=self.attr["ratingbyauthor"]
+				)\
+			+ errorline
 		
-		outtxt =  \
-		  "@RED %s @CLEAR	Schnitte:  @BLUE %s @CLEAR (%s)	Spielzeit: @BLUE %s @CLEAR (hh:mm:ss)\n" % \
-													(number, cuts, cutsformat, duration) \
-		+ "@BLACK%s@CLEAR	Bewertung: @BLUE %s (%s/%s) @CLEAR    	Autor:     @BLUE %s (%s) @CLEAR\n" \
-				% (self.attr["metarating"], rating, self.attr["ratingcount"], self.attr["downloadcount"], 
-																			author, self.attr["ratingbyauthor"])\
-		+ errorline
 		if self.attr["usercomment"]:
 			outtxt += "	Kommentar: @BLUE %s @CLEAR\n" % self.attr["usercomment"]
 		
@@ -703,7 +708,7 @@ class CutListOwnProvider:
 		class View:
 			def __init__(self):
 				self.cutlists = prov.getCutlists(filename)
-				print "%d Cutlist(s) wurden schon von Ihnen erstellt" % len(self.cutlists)
+				print "%d Cutlist(s) wurde(n) schon von Ihnen (für diese Datei) erstellt" % len(self.cutlists)
 
 				for i, cutlist in enumerate(self.cutlists):
 					print "[%2d] Cutlist: %s" % (i+1,cutlist[0])
@@ -778,8 +783,11 @@ class CutListOwnProvider:
 			print infotxt
 			print
 			
-			s = raw_input("Cutlist annehmen [J/n]: ").strip()
-			if 'n' in s.lower():
+			s = raw_input("Cutlist annehmen/anzeigen [J/n/a]: ").strip()
+			if 'a' in s.lower():
+				print "%s\n%s" % (cutlist, infotxt)
+				continue
+			elif 'n' in s.lower():
 				continue
 			else:
 				break
@@ -919,7 +927,8 @@ class CutListGenerator:
 		#
 		# writing cutlist to self.cutlistfile
 		#
-		cutlist = self.generateCutList(project.split("app.addSegment(0")[1:])
+		segments = project.split("app.addSegment(0")[1:]
+		cutlist = self.generateCutList(segments)
 		Debug(3, "Created cutlist:\n"+cutlist)
 		open(self.cutlistfile, "w").write(cutlist)
 		
@@ -936,7 +945,7 @@ class CutListGenerator:
 	
 	def generateCutList(self, segments):
 		cstr = '[General]\n'\
-			+ 'Application=multicut_evolution.py\n'\
+			+ 'Application=multicut_evolution\n'\
 			+ 'Version=%s\n' % multicut_evolution_date\
 			+ 'comment1=Diese Cutlist unterliegt den Nutzungsbedingungen von cutlist.at (Stand: 14.Oktober 2008)\n'\
 			+ 'comment2=http://cutlist.at/terms/\n'\
@@ -946,7 +955,6 @@ class CutListGenerator:
 			+ 'IntendedCutApplication=Avidemux\n'\
 			+ 'IntendedCutApplicationVersion=2.5\n'\
 			+ 'IntendedCutApplicationOptions=\n'\
-			+ 'CutCommandLine=\n'\
 			+ 'NoOfCuts=%s\n' % self.numberOfCuts
 
 			

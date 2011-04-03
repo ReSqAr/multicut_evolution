@@ -416,6 +416,11 @@ class CutList:
 			StartInFrames = [int( float(d) * fps + 0.5 ) for d in Start]
 			Duration = re.findall("Duration=(?P<value>[-0-9.]*)", cutlisttxt)
 			DurationInFrames = [int( float(d) * fps + 0.5 ) for d in Duration]
+		for i, duration in enumerate(DurationInFrames):
+			if duration < 0:
+				print "Warnung: Cutlist listet negative Zeitdauern."
+				StartInFrames[i] += duration
+				DurationInFrames[i] = -duration
 		return StartInFrames, DurationInFrames
 	
 	def TimesInSeconds(self):
@@ -424,6 +429,11 @@ class CutList:
 		Start = [float(d) for d in Start]
 		Duration = re.findall("Duration=(?P<value>[-0-9.]*)", cutlisttxt)
 		Duration = [float(d) for d in Duration]
+		for i, duration in enumerate(Duration):
+			if duration < 0:
+				print "Warnung: Cutlist listet negative Zeitdauern."
+				Start[i] += duration
+				Duration[i] = -duration
 		return Start, Duration
 
 	def CutListToConsoleText(self, n):
@@ -1463,7 +1473,7 @@ def main():
 		print "%sEs wurde kein Provider gefunden, überprüfen Sie ihre Parameter.%s" % (C_RED,C_CLEAR)
 		sys.exit()
 	for key, value in sorted(o.cutlistprovider.items(), key=lambda x:x[0]): #sort by name
-		std = " [default]" if key == o.defaultproviderlist[0] else ""
+		std = " [Standard]" if key == o.defaultproviderlist[0] else ""
 		print "  %s - %s%s" % (key,value.desc,std)
 	print
 	print

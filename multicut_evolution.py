@@ -22,7 +22,7 @@
 
 import subprocess
 import os, shutil, codecs, pwd
-import httplib
+import httplib, mimetypes
 import time
 import random
 import tempfile
@@ -42,8 +42,8 @@ C_BLACK			= "\033[40;37;1m"
 C_RED_UNDERLINE	= "\033[41;37;1;4m"
 C_BOLD			= "\033[1m"
 
-multicut_evolution_date = "25.03.2010"
-prog_id = "multicut_evolution.py/%s" % multicut_evolution_date
+multicut_evolution_date = "04.04.2011"
+prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
 prog_help = \
@@ -350,6 +350,56 @@ class FileCache:
 		self.memoryCache[uuid] = content
 		return content
 
+
+###
+# post multipart method
+# credit: http://code.activestate.com/recipes/146306-http-client-to-post-using-multipartform-data/
+###
+def post_multipart(host, selector, fields, files):
+	"""
+	Post fields and files to an http host as multipart/form-data.
+	fields is a sequence of (name, value) elements for regular form fields.
+	files is a sequence of (name, filename, value) elements for data to be uploaded as files
+	Return the server's response.
+	"""
+	content_type, body = encode_multipart_formdata(fields, files)
+	headers = {
+		'User-Agent': prog_id,
+		'Content-Type': content_type
+		}
+	h = httplib.HTTPConnection(host)
+	h.request('POST', selector, body, headers)
+	res = h.getresponse()
+	return res.status, res.reason, res.read()
+
+def encode_multipart_formdata(fields, files):
+	"""
+	fields is a sequence of (name, value) elements for regular form fields.
+	files is a sequence of (name, filename, value) elements for data to be uploaded as files
+	Return (content_type, body) ready for httplib.HTTP instance
+	"""
+	BOUNDARY = '----------ThIs_Is_tHe_bouNdaRY_$'
+	CRLF = '\r\n'
+	L = []
+	for (key, value) in fields:
+		L.append('--' + BOUNDARY)
+		L.append('Content-Disposition: form-data; name="%s"' % key)
+		L.append('')
+		L.append(value)
+	for (key, filename, value) in files:
+		L.append('--' + BOUNDARY)
+		L.append('Content-Disposition: form-data; name="%s"; filename="%s"' % (key, filename))
+		L.append('Content-Type: %s' % get_content_type(filename))
+		L.append('')
+		L.append(value)
+	L.append('--' + BOUNDARY + '--')
+	L.append('')
+	body = CRLF.join([element.decode('string_escape') for element in L])
+	content_type = 'multipart/form-data; boundary=%s' % BOUNDARY
+	return content_type, body
+
+def get_content_type(filename):
+    return mimetypes.guess_type(filename)[0] or 'application/octet-stream'
 
 ###
 # CutList Class
@@ -802,47 +852,29 @@ class CutListOwnProvider:
 		if len(fname) != 1:
 			print "Illegale Cutlist, uploaden nicht möglich."
 			return
-		fname = fname[0][len("ApplyToFile="):].strip()
+		fname = fname[0].split('=',1)[1].strip()
 
-		opener = urllib2.build_opener()
-		opener.addheaders = [ ('User-agent', prog_id)]
-
-		#
-		# credit to: Benjamin Elbers
-		# (https://github.com/elbersb/otr-verwaltung/blob/347bffee4c4f9db52ac715790be5a05d98801d30/otrverwaltung/cutlists.py)
-		#
-		boundary = '$$$$boundary$$$$d52f909eb7bab6a825d0386c7072a6ae69fe14cb$$$$'
-		headers = { 'Content-Type': 'multipart/form-data; boundary=%s' % boundary }
-		lines = [
-			'--' + boundary,
-			'Content-Disposition: form-data; name="userid"',
-			'',
-			self.cutoptions.cutlistathash,
-			'--' + boundary,
-			'Content-Disposition: form-data; name="userfile[]"; filename="%s"' % (fname + '.cutlist'),
-			'',
-			cutlist,
-			'--' + boundary + '--',
-			'']
-
-		body = '\r\n'.join(lines)
-		Debug(4,"upload body:\n%s" % body)
-
-		server = "www.cutlist.at"
-		connection = httplib.HTTPConnection(server)
-		headers = { 'Content-Type': 'multipart/form-data; boundary=%s' % boundary }
+		host = "www.cutlist.at"
+		selector = "/user/%s/" % self.cutoptions.cutlistathash
+		fields = [ ]
+		files = [ ("userfile[]", fname + '.cutlist', cutlist.replace('\n','\r\n')) ]
 
 		try:
-			connection.request('POST', server + "index.php?upload=2", body, headers)
+			response = post_multipart(host, selector, fields, files)
 		except Exception, e:
 			print "Upload ist fehlgeschlagen: %s" % e
+			return
 
-		response = connection.getresponse().read()
-		if 'erfolgreich' in response:
+		Debug(2,"Server-Antwort-Code: %s" % response[0])
+		Debug(2,"Server-Antwort-Grund: %s" % response[1])
+		Debug(2,"Server-Antwort: %s" % response[2])
+		
+		if 'erfolgreich' in response[2].lower():
 			print "Upload war erfolgreich"
-			Debug(2,"Server-Antwort: %s" % response)
 		else:
-			print "Upload ist fehlgeschlagen: %s" % response
+			print "Upload ist fehlgeschlagen: %s" % response[2]
+		
+
 
 ###
 # CutListFileProvider
@@ -930,7 +962,7 @@ class CutListGenerator:
 		#
 		# writing cutlist to self.cutlistfile
 		#
-		segments = project.split("app.addSegment(0")[1:]
+		segments = project.split("app.addSegment(")[1:]
 		cutlist = self.generateCutList(segments)
 		Debug(3, "Created cutlist:\n"+cutlist)
 		open(self.cutlistfile, "w").write(cutlist)
@@ -1665,8 +1697,6 @@ def main():
 				print "%d von %d" % (i+1, len(avis2Check))
 				c_n[0].ShowCut()	
 				c_n[1] += 1
-
-
 
 
 if __name__ == '__main__':

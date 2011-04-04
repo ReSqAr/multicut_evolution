@@ -26,6 +26,7 @@ import httplib, mimetypes
 import time
 import random
 import tempfile
+import traceback
 import urllib2
 import re
 import sys
@@ -406,10 +407,10 @@ def get_content_type(filename):
 ###
 class CutList:
 	"""
-	encapsulates a cutlist (with some metainformation) and some common operations,
+	encapsulates a cutlist (with some meta information) and some common operations,
 	like viewing cutlist and showing metadata
 	"""
-	def __init__(self, cutlistprov, cutlist_meta_xml=None, cutlist_meta_dict=None):
+	def __init__(self, cutlistprov, cutlist_meta_xml=None, cutlist_meta_dict=None, cutlist_dict=None):
 		self.cutlistprov = cutlistprov
 		
 		if cutlist_meta_xml:
@@ -437,6 +438,16 @@ class CutList:
 		else:
 			self.attr["metarating"] = 0.
 	
+		#
+		# init cutlist dict
+		#
+		if cutlist_dict:
+			if not set(["frames","file","size","fps"]) <= set(cutlist_dict.keys()):
+				print "ERROR: cutlist_dict carries too less information: keys: %s" % cutlist_dict.keys()
+				raise AssertionError("cutlist_dict carries too less information: keys: %s" % cutlist_dict.keys())
+			self.cutlist_dict = dict(cutlist_dict)
+		else: 
+			self.cutlist_dict = {}
 	
 	def __contains__(self, key):
 		return key in self.attr
@@ -447,45 +458,154 @@ class CutList:
 	def __setitem__(self, key, value):
 		self.attr[key] = value
 	
-	def GetCutList(self):
+	def GetRawCutList(self):
+		""" may raise a NotImplementedError """
 		return self.cutlistprov.GetCutList(self.attr["id"])
-
+		
+	def __GetCutList(self):
+		if not self.cutlist_dict:
+			cutlisttxt = self.GetRawCutList()
+			# extract fps
+			self.cutlist_dict["fps"] = float( re.search("FramesPerSecond=(?P<value>[-0-9.]*)", cutlisttxt).group('value') )
+			# extract file
+			try: self.cutlist_dict["file"] = re.search("ApplyToFile=(?P<value>.*)", cutlisttxt).group('value').strip()
+			except: print "Conversion: Filename not found:\n%s" % cutlisttxt
+			# extract file size
+			try: self.cutlist_dict["size"] = int( re.search("OriginalFileSizeBytes=(?P<value>[0-9.]*)", cutlisttxt).group('value') )
+			except: print "Conversion: Filesize not found:\n%s" % cutlisttxt
+			
+			# extract timings
+			if "\nStartFrame" in cutlisttxt:
+				StartInFrames = re.findall("StartFrame=(?P<value>[-0-9]*)", cutlisttxt)
+				StartInFrames = [int(d) for d in StartInFrames]
+				DurationInFrames= re.findall("DurationFrames=(?P<value>[-0-9]*)", cutlisttxt)
+				DurationInFrames = [int(d) for d in DurationInFrames]
+			else:
+				fps = self.cutlist_dict["fps"]
+				Start = re.findall("Start=(?P<value>[-0-9.]*)", cutlisttxt)
+				StartInFrames = [int( float(d) * fps + 0.5 ) for d in Start]
+				Duration = re.findall("Duration=(?P<value>[-0-9.]*)", cutlisttxt)
+				DurationInFrames = [int( float(d) * fps + 0.5 ) for d in Duration]
+			for i, duration in enumerate(DurationInFrames):
+				if duration < 0:
+					print "Warnung: Cutlist listet negative Zeitdauern."
+					StartInFrames[i] += duration
+					DurationInFrames[i] = -duration
+			self.cutlist_dict["frames"] = zip(StartInFrames, DurationInFrames)
+		return self.cutlist_dict
+		
 	def GetFPS(self):
-		cutlisttxt = self.GetCutList()
-		return float( re.search("FramesPerSecond=(?P<value>[-0-9.]*)", cutlisttxt).group('value') )
+		return self.__GetCutList()["fps"]
 
 	def TimesInFrames(self):
-		cutlisttxt = self.GetCutList()
-		if "\nStartFrame" in cutlisttxt:
-			StartInFrames = re.findall("StartFrame=(?P<value>[-0-9]*)", cutlisttxt)
-			StartInFrames = [int(d) for d in StartInFrames]
-			DurationInFrames= re.findall("DurationFrames=(?P<value>[-0-9]*)", cutlisttxt)
-			DurationInFrames = [int(d) for d in DurationInFrames]
-		else:
-			fps = self.GetFPS()
-			Start = re.findall("Start=(?P<value>[-0-9.]*)", cutlisttxt)
-			StartInFrames = [int( float(d) * fps + 0.5 ) for d in Start]
-			Duration = re.findall("Duration=(?P<value>[-0-9.]*)", cutlisttxt)
-			DurationInFrames = [int( float(d) * fps + 0.5 ) for d in Duration]
-		for i, duration in enumerate(DurationInFrames):
-			if duration < 0:
-				print "Warnung: Cutlist listet negative Zeitdauern."
-				StartInFrames[i] += duration
-				DurationInFrames[i] = -duration
-		return StartInFrames, DurationInFrames
+		frames = self.__GetCutList()["frames"]
+		return [start for start, duration in frames], [duration for start, duration in frames]
 	
 	def TimesInSeconds(self):
-		cutlisttxt = self.GetCutList()
-		Start = re.findall("Start=(?P<value>[-0-9.]*)", cutlisttxt)
-		Start = [float(d) for d in Start]
-		Duration = re.findall("Duration=(?P<value>[-0-9.]*)", cutlisttxt)
-		Duration = [float(d) for d in Duration]
-		for i, duration in enumerate(Duration):
-			if duration < 0:
-				print "Warnung: Cutlist listet negative Zeitdauern."
-				Start[i] += duration
-				Duration[i] = -duration
-		return Start, Duration
+		cutlist = self.__GetCutList()
+		fps = cutlist["fps"]
+		frames = cutlist["frames"]
+		return [start/fps for start, duration in frames], [duration/fps for start, duration in frames]
+
+	def GenerateRawCutList(self):
+		cutlist = self.__GetCutList()
+		cstr = '[General]\n'\
+			+ 'Application=multicut_evolution\n'\
+			+ 'Version=%s\n' % multicut_evolution_date\
+			+ 'comment1=Diese Cutlist unterliegt den Nutzungsbedingungen von cutlist.at (Stand: 14. Oktober 2008)\n'\
+			+ 'comment2=http://cutlist.at/terms/\n'\
+			+ 'ApplyToFile=%s\n' % cutlist["file"]\
+			+ 'OriginalFileSizeBytes=%s\n' % cutlist["size"]\
+			+ 'FramesPerSecond=%s\n' % cutlist["fps"]\
+			+ 'IntendedCutApplication=Avidemux\n'\
+			+ 'IntendedCutApplicationVersion=2.5\n'\
+			+ 'IntendedCutApplicationOptions=\n'\
+			+ 'NoOfCuts=%s\n' % len(cutlist["frames"])
+			
+		for cut, (start,duration) in enumerate(cutlist["frames"]):
+			cstr += '\n[Cut%s]\n' % cut\
+				+ 'Start=%f\n' % (float(start)/cutlist["fps"]) \
+				+ 'StartFrame=%s\n' %start\
+				+ 'Duration=%f\n' % (float(duration)/cutlist["fps"]) \
+				+ 'DurationFrames=%s\n' % duration
+		
+		return cstr
+
+	def GenerateCompleteCutList(self):
+		cutlist = self.GenerateRawCutList()
+
+		attr = [	# display				internal  			(initial) value
+					['Ihre Bewertung', 		'RatingByAuthor', 	''],
+					['Kommentar',			'UserComment',		''],
+					['Filmnamensvorschlag', 'SuggestedMovieName',''],
+				]
+		errors = ""
+		othererrormessage = ""
+
+		def input_function(s, value):
+			if s.lower() == 'clear':	return ''
+			elif s:						return s
+			else:						return value
+
+		while True:
+			print
+			print "Nun folgen einige Fragen zu dieser Cutlist:"
+			print
+			for div in attr:
+				display, _, value = div
+				s = raw_input("%s[%s]: " % (display, value)).strip()
+				div[2] = input_function(s, value)
+			
+			print "Fehler:"
+			print "  1. EPG-Fehler"
+			print "  2. Anfang fehlt"
+			print "  3. Ende fehlt"
+			print "  4. Ton fehlt"
+			print "  5. Video fehlt"
+			print "  6. Anderer Fehler"
+			s = raw_input("Auswahl (Komma-separierte Liste) [%s]: " % errors)
+			errors = input_function(s, errors)
+			
+			if "6" in errors:
+				s = raw_input("Beschreibung des Fehlers [%s]: " % othererrormessage)
+				othererrormessage = input_function(s, othererrormessage)
+			
+			infotxt = \
+				'[Info]\n'\
+				+ 'Author=%s\n' % self.cutlistprov.cutoptions.author\
+				+ ''.join( ["%s=%s\n" % (internal, value) for _, internal, value in attr] ) \
+				+ 'EPGError=%s\n' % ("1" if "1" in errors else "0") \
+				+ 'ActualContent=%s\n' % ""\
+				+ 'MissingBeginning=%s\n' % ("1" if "2" in errors else "0") \
+				+ 'MissingEnding=%s\n' % ("1" if "3" in errors else "0") \
+				+ 'MissingAudio=%s\n' % ("1" if "4" in errors else "0") \
+				+ 'MissingVideo=%s\n' % ("1" if "5" in errors else "0") \
+				+ 'OtherError=%s\n' % ("1" if "6" in errors and othererrormessage else "0") \
+				+ 'OtherErrorDescription=%s\n' % (othererrormessage if "6" in errors and othererrormessage else "") 
+			
+			print
+			print "Cutlist Infotext:"
+			for line in infotxt.strip().split('\n'):
+				print ">", line
+			print
+			
+			s = raw_input("Cutlist annehmen/editieren/betrachten/verwerfen [A/e/b/v]: ").strip().lower()
+			if 'a' in s or not s: # annehmen
+				return "%s\n%s" % (infotxt, cutlist)
+			elif 'e' in s: # editieren
+				continue
+			elif 'b' in s: # betrachten
+				print "Cutlist:"
+				for line in ("%s\n%s" % (infotxt, cutlist)).strip().split('\n'):
+					print ">", line
+				print
+				continue
+			elif 'v' in s: # verwerfen
+				return None
+			else:
+				continue
+		
+		return None
 
 	def CutListToConsoleText(self, n):
 		number = "[%d]" % n
@@ -587,7 +707,7 @@ class CutList:
 		Run("mplayer", ["-edl", edlfile, "-sub", subfile, "-osdlevel", "3", path])
 	
 	def PostProcessCutList(self):
-		self.cutlistprov.PostProcessCutList( self.attr["id"] )
+		self.cutlistprov.PostProcessCutList( self.attr["id"], self )
 
 
 ###
@@ -674,7 +794,7 @@ class CutListAT:
 	#
 	# rate cutlist
 	#
-	def PostProcessCutList( self, cl_id ):
+	def PostProcessCutList( self, cl_id, cutlist ):
 		if not self.cutoptions.do_rate:
 			print "Bewerten ausgelassen."
 			return
@@ -718,14 +838,20 @@ class CutListOwnProvider:
 		self.cutoptions = cutoptions
 		self.desc = "Eigene Cutlists erstellen."
 		
-		self.cutlistCache = FileCache("mycutlist", cutoptions.cachedir, lambda x: "", None, lambda x: Debug(2, x))
+		self.cutlistCache = FileCache("mycutlists", cutoptions.cachedir, lambda x: "", None, lambda x: Debug(2, x))
 		self.delimiter = "66b29df4086fd34e6c63631553132e8421d5fe3698ba5120358ee31ffed9b518e61d0b0ed6a583ec1fd7367aab7af928196391f3131929\n"
 	
 	def getCutlists(self, filename):
 		precutlists = self.cutlistCache.get(filename)
+		print precutlists
 		precutlists = precutlists.split(self.delimiter) if precutlists else []
 		precutlists = [ cutlist.split('\n',1) for cutlist in precutlists ]
-		return [ (comment, CutList(self,cutlist_meta_dict={'id':precutlist})) for comment, precutlist in precutlists ]
+		cutlists = []
+		for comment, precutlist in precutlists:
+			cutlist = ast.literal_eval(precutlist)
+			cutlist = CutList(self, cutlist_meta_dict={'id':hash(precutlist)}, cutlist_dict=cutlist)
+			cutlists.append( (comment, cutlist) )
+		return cutlists
 	
 	def addCutlist(self, filename, cutlist):
 		precutlists = self.cutlistCache.get(filename)
@@ -733,7 +859,7 @@ class CutListOwnProvider:
 
 		comment = datetime.datetime.now().strftime("%H:%M:%S am %d.%m.%Y")
 		
-		addcutlist = "%s\n%s" % (comment, cutlist)
+		addcutlist = "%s\n%s" % (comment, repr(cutlist))
 		
 		precutlists.append(addcutlist)
 		self.cutlistCache.updateContent(filename, self.delimiter.join(precutlists))
@@ -742,12 +868,12 @@ class CutListOwnProvider:
 		cutlist = CutListGenerator(self).makeCutList(path)
 		if cutlist:
 			self.addCutlist(os.path.basename(path), cutlist)
-			return CutList(self,cutlist_meta_dict={'id':cutlist}) #full abuse, but it's ok... (but no metadata available)
+			return CutList(self, cutlist_meta_dict={'id':hash(repr(cutlist))}, cutlist_dict=cutlist)
 		else:
 			return None
 		
 	def GetCutList(self, cl_id):
-		return cl_id
+		raise NotImplementedError("Method has not to be called")
 
 	#
 	# getView
@@ -787,7 +913,7 @@ class CutListOwnProvider:
 	#
 	# upload cutlist
 	#
-	def PostProcessCutList( self, cl_id ):
+	def PostProcessCutList( self, cl_id, cutlist ):
 		if not self.cutoptions.cutlistathash:
 			print "Kein Cutlist.at-Benutzerhash angegeben, daher kann die Cutlist nicht hochgeladen werden."
 			return
@@ -796,78 +922,13 @@ class CutListOwnProvider:
 		if 'n' in s.lower():
 			return
 
-		cutlist = self.GetCutList(cl_id)
-		attr = [	# display				internal  			(initial) value
-					['Autor',  				'Author', 			self.cutoptions.author],
-					['Ihre Bewertung', 		'RatingByAuthor', 	''],
-					['Kommentar',			'UserComment',		''],
-					['Filmnamensvorschlag', 'SuggestedMovieName',''],
-				]
-		
-		errors = ""
-		othererrormessage = ""
-		
-		print
-		
-		def input_function(s, value):
-			if s.lower() == 'clear':
-				return ''
-			elif s:
-				return s
-			else:
-				return value
-			
-		
-		while True:
-			for did in attr:
-				display, _, value = did
-				s = raw_input("%s[%s]: " % (display, value)).strip()
-				did[2] = input_function(s, did[2])
-			
-			print "Fehler:"
-			print "  1. EPG-Fehler"
-			print "  2. Anfang fehlt"
-			print "  3. Ende fehlt"
-			print "  4. Ton fehlt"
-			print "  5. Video fehlt"
-			print "  6. Anderer Fehler"
-			s = raw_input("Auswahl (Komma-separiert) [%s]: " % errors)
-			errors = input_function(s, errors)
-			
-			if "6" in errors:
-				s = raw_input("Beschreibung des Fehlers [%s]: " % othererrormessage)
-				othererrormessage = input_function(s, othererrormessage)
-			
-			infotxt = \
-				'[Info]\n'\
-				+ ''.join( ["%s=%s\n" % (internal, value) for _, internal, value in attr] ) \
-				+ 'EPGError=%s\n' % ("1" if "1" in errors else "0") \
-				+ 'ActualContent=%s\n' % ""\
-				+ 'MissingBeginning=%s\n' % ("1" if "2" in errors else "0") \
-				+ 'MissingEnding=%s\n' % ("1" if "3" in errors else "0") \
-				+ 'MissingAudio=%s\n' % ("1" if "4" in errors else "0") \
-				+ 'MissingVideo=%s\n' % ("1" if "5" in errors else "0") \
-				+ 'OtherError=%s\n' % ("1" if "6" in errors and othererrormessage else "0") \
-				+ 'OtherErrorDescription=%s\n' % (othererrormessage if "6" in errors and othererrormessage else "") 
-			
+		cutlisttxt = cutlist.GenerateCompleteCutList()
+		if cutlisttxt:
+			self.UploadCutList(cutlisttxt)
+		else:
 			print
-			print "Cutlist Infotext:"
-			print infotxt
+			print "Vorgang abgebrochen, die Cutlist wird nicht hochgeladen!"
 			print
-			
-			s = raw_input("Cutlist annehmen (oder anzeigen [v]) [J/n/v]: ").strip()
-			if 'v' in s.lower():
-				print "Cutlist:"
-				for line in ("%s\n%s" % (infotxt, cutlist)).split('\n'):
-					print ">", line
-				print
-				continue
-			elif 'n' in s.lower():
-				continue
-			else:
-				break
-		
-		self.UploadCutList("%s\n%s" % (infotxt, cutlist))
 
 	def UploadCutList(self, cutlist):
 		fname = [line for line in cutlist.split('\n') if line.startswith("ApplyToFile=")]
@@ -880,7 +941,7 @@ class CutListOwnProvider:
 		selector = "/user/%s/" % self.cutoptions.cutlistathash
 		fields = [ ]
 		files = [ ("userfile[]", fname + '.cutlist', cutlist.replace('\n','\r\n')) ]
-
+		
 		try:
 			response = post_multipart(host, selector, fields, files)
 		except Exception, e:
@@ -932,7 +993,7 @@ class CutListFileProvider:
 	#
 	# noop
 	#
-	def PostProcessCutList( self, cl_id ):
+	def PostProcessCutList( self, cl_id, cutlist ):
 		pass
 ###
 # CutListGenerator
@@ -949,7 +1010,6 @@ class CutListGenerator:
 		self.basename = os.path.basename(filename)
 		self.tmpname = "%s_own_project.js" % random.getrandbits(32)
 		self.tmppath = self.cutlistprov.cutoptions.tempdir + self.tmpname
-		self.cutlistfile = self.cutlistprov.cutoptions.tempdir+self.basename+'.cutlist'
 		self.writePreAvidemuxProject()
 		
 		#
@@ -973,8 +1033,7 @@ class CutListGenerator:
 		if not "app.addSegment" in project:
 			print "Keine Schnitte angegeben!"
 			return None
-		
-		self.numberOfCuts = len(project.split("app.addSegment"))-1
+
 		if "app.video.fps1000" in project:
 			grapFPS = project.split("app.video.fps1000")[1].split('=')[1].split(';')[0].strip()
 		else:
@@ -982,16 +1041,22 @@ class CutListGenerator:
 		self.FPS = float(grapFPS)*0.001
 		
 		#
-		# writing cutlist to self.cutlistfile
+		# creating cutlist data
 		#
-		segments = project.split("app.addSegment(")[1:]
-		cutlist = self.generateCutList(segments)
-		Debug(3, "Created cutlist:\n"+cutlist)
-		open(self.cutlistfile, "w").write(cutlist)
+		cutlist = {}
 		
-		#
-		# buidling cutlist
-		#
+		cuts = []
+		segments = project.split("app.addSegment(")[1:]
+		for segment in segments:
+			start    = int( segment.split(',')[1] )
+			duration = int( segment.split(',')[2].split(')')[0] )
+			cuts.append( (start, duration) )
+		
+		cutlist["frames"] = cuts
+		cutlist["fps"] = self.FPS
+		cutlist["file"] = self.basename
+		cutlist["size"] = os.path.getsize(self.filename)
+
 		return cutlist
 	
 	def writePreAvidemuxProject(self):
@@ -1000,31 +1065,7 @@ class CutListGenerator:
 			+ 'app.load("%s");\n' % self.filename
 		open(self.tmppath, "a").write(pstr)
 	
-	def generateCutList(self, segments):
-		cstr = '[General]\n'\
-			+ 'Application=multicut_evolution\n'\
-			+ 'Version=%s\n' % multicut_evolution_date\
-			+ 'comment1=Diese Cutlist unterliegt den Nutzungsbedingungen von cutlist.at (Stand: 14. Oktober 2008)\n'\
-			+ 'comment2=http://cutlist.at/terms/\n'\
-			+ 'ApplyToFile=%s\n' % self.basename\
-			+ 'OriginalFileSizeBytes=%s\n' % os.path.getsize(self.filename)\
-			+ 'FramesPerSecond=%s\n' % self.FPS\
-			+ 'IntendedCutApplication=Avidemux\n'\
-			+ 'IntendedCutApplicationVersion=2.5\n'\
-			+ 'IntendedCutApplicationOptions=\n'\
-			+ 'NoOfCuts=%s\n' % self.numberOfCuts
 
-			
-		for cut, segment in enumerate(segments):
-			start    = segment.split(',')[1]
-			duration = segment.split(',')[2].split(')')[0]
-			cstr += '\n[Cut%s]\n' % cut\
-				+ 'Start=%f\n' % (float(start)/self.FPS) \
-				+ 'StartFrame=%s\n' %start\
-				+ 'Duration=%f\n' % (float(duration)/self.FPS) \
-				+ 'DurationFrames=%s\n' % duration
-		
-		return cstr
 
 		
 
@@ -1240,7 +1281,7 @@ class CutFile:
 						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path)
 						break
 				else:
-					for flag in ['test', 'cat']:
+					for flag in ['test', "cat"]:
 						if inp.lower().startswith(flag):
 							specials.append(flag)
 							inp = inp[len(flag):]
@@ -1254,7 +1295,10 @@ class CutFile:
 					if 'test' in specials:
 						self.cutlist.ShowCuts(self.path, is_filecut = False, tempdir = self.cutoptions.tempdir)
 					if 'cat' in specials:
-						cutlist = self.cutlist.GetCutList()
+						try:
+							cutlist = self.cutlist.GetRawCutList()
+						except:
+							cutlist = self.cutlist.GenerateRawCutList()
 						print "Cutlist:"
 						for line in cutlist.split('\n'):
 							print ">", line
@@ -1490,6 +1534,7 @@ def main():
 						"config=","verbosity="])
 	except getopt.GetoptError, err:
 		print C_RED + str(err) + C_CLEAR # will print something like "option -a not recognized"
+		print
 		print prog_help
 		sys.exit(2)
 	
@@ -1629,7 +1674,10 @@ def main():
 				checkfiles.append(c)
 		except StandardError,e:
 			print e
+			print "Stacktrace:"
+			traceback.print_exc()
 			print "Life has to go on..."
+			
 			errors.append( (e,c) )
 	
 	try:

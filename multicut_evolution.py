@@ -471,8 +471,11 @@ class CutList:
 			try: self.cutlist_dict["file"] = re.search("ApplyToFile=(?P<value>.*)", cutlisttxt).group('value').strip()
 			except: print "Conversion: Filename not found:\n%s" % cutlisttxt
 			# extract file size
-			try: self.cutlist_dict["size"] = int( re.search("OriginalFileSizeBytes=(?P<value>[0-9.]*)", cutlisttxt).group('value') )
+			try: self.cutlist_dict["size"] = int( re.search("OriginalFileSizeBytes=(?P<value>[-0-9.]*)", cutlisttxt).group('value') )
 			except: print "Conversion: Filesize not found:\n%s" % cutlisttxt
+			if self.cutlist_dict["size"] < 0:
+				print "Warnung: Cutlist listet eine negative Dateigröße. Autokorrektur."
+				self.cutlist_dict["size"] += 2**32
 			
 			# extract timings
 			if "\nStartFrame" in cutlisttxt:
@@ -488,7 +491,7 @@ class CutList:
 				DurationInFrames = [int( float(d) * fps + 0.5 ) for d in Duration]
 			for i, duration in enumerate(DurationInFrames):
 				if duration < 0:
-					print "Warnung: Cutlist listet negative Zeitdauern."
+					print "Warnung: Cutlist listet negative Zeitdauern. Autokorrektur."
 					StartInFrames[i] += duration
 					DurationInFrames[i] = -duration
 			self.cutlist_dict["frames"] = zip(StartInFrames, DurationInFrames)

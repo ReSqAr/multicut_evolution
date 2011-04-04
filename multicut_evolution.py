@@ -804,37 +804,59 @@ class CutListOwnProvider:
 					['Filmnamensvorschlag', 'SuggestedMovieName',''],
 				]
 		
+		errors = ""
+		othererrormessage = ""
+		
 		print
+		
+		def input_function(s, value):
+			if s.lower() == 'clear':
+				return ''
+			elif s:
+				return s
+			else:
+				return value
+			
+		
 		while True:
 			for did in attr:
 				display, _, value = did
 				s = raw_input("%s[%s]: " % (display, value)).strip()
-				if s.lower() == 'clear':
-					did[2] = ''
-				elif s:
-					did[2] = s
-				else:
-					pass
+				did[2] = input_function(s, did[2])
+			
+			print "Fehler:"
+			print "  1. EPG-Fehler"
+			print "  2. Anfang fehlt"
+			print "  3. Ende fehlt"
+			print "  4. Ton fehlt"
+			print "  5. Video fehlt"
+			print "  6. Anderer Fehler"
+			s = raw_input("Auswahl (Komma-separiert) [%s]: " % errors)
+			errors = input_function(s, errors)
+			
+			if "6" in errors:
+				s = raw_input("Beschreibung des Fehlers [%s]: " % othererrormessage)
+				othererrormessage = input_function(s, othererrormessage)
 			
 			infotxt = \
 				'[Info]\n'\
 				+ ''.join( ["%s=%s\n" % (internal, value) for _, internal, value in attr] ) \
-				+ 'EPGError=%s\n' % ""\
+				+ 'EPGError=%s\n' % ("1" if "1" in errors else "0") \
 				+ 'ActualContent=%s\n' % ""\
-				+ 'MissingBeginning=%s\n' % ""\
-				+ 'MissingEnding=%s\n' % ""\
-				+ 'MissingAudio=%s\n' % ""\
-				+ 'MissingVideo=%s\n' % ""\
-				+ 'OtherError=%s\n' % ""\
-				+ 'OtherErrorDescription=%s\n' % ""
+				+ 'MissingBeginning=%s\n' % ("1" if "2" in errors else "0") \
+				+ 'MissingEnding=%s\n' % ("1" if "3" in errors else "0") \
+				+ 'MissingAudio=%s\n' % ("1" if "4" in errors else "0") \
+				+ 'MissingVideo=%s\n' % ("1" if "5" in errors else "0") \
+				+ 'OtherError=%s\n' % ("1" if "6" in errors and othererrormessage else "0") \
+				+ 'OtherErrorDescription=%s\n' % (othererrormessage if "6" in errors and othererrormessage else "") 
 			
 			print
 			print "Cutlist Infotext:"
 			print infotxt
 			print
 			
-			s = raw_input("Cutlist annehmen (oder anzeigen) [J/n/a(nzeigen)]: ").strip()
-			if 'a' in s.lower():
+			s = raw_input("Cutlist annehmen (oder anzeigen [v]) [J/n/v]: ").strip()
+			if 'v' in s.lower():
 				print "Cutlist:"
 				for line in ("%s\n%s" % (infotxt, cutlist)).split('\n'):
 					print ">", line
@@ -982,7 +1004,7 @@ class CutListGenerator:
 		cstr = '[General]\n'\
 			+ 'Application=multicut_evolution\n'\
 			+ 'Version=%s\n' % multicut_evolution_date\
-			+ 'comment1=Diese Cutlist unterliegt den Nutzungsbedingungen von cutlist.at (Stand: 14.Oktober 2008)\n'\
+			+ 'comment1=Diese Cutlist unterliegt den Nutzungsbedingungen von cutlist.at (Stand: 14. Oktober 2008)\n'\
 			+ 'comment2=http://cutlist.at/terms/\n'\
 			+ 'ApplyToFile=%s\n' % self.basename\
 			+ 'OriginalFileSizeBytes=%s\n' % os.path.getsize(self.filename)\

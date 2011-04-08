@@ -43,7 +43,7 @@ C_BLACK			= "\033[40;37;1m"
 C_RED_UNDERLINE	= "\033[41;37;1;4m"
 C_BOLD			= "\033[1m"
 
-multicut_evolution_date = "04.04.2011"
+multicut_evolution_date = "08.04.2011"
 prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
@@ -178,6 +178,7 @@ avidemux_cmds = ["avidemux2_cli", "avidemux_cli",
 
 search_request_expire_period = datetime.timedelta(hours=2)
 cutlist_expire_period = datetime.timedelta(days=12)
+comments_expire_period = datetime.timedelta(hours=2)
 
 ###
 # Helper functions
@@ -713,7 +714,6 @@ class CutList:
 	def PostProcessCutList(self):
 		self.cutlistprov.PostProcessCutList( self.attr["id"], self )
 
-
 ###
 # CutListAT as CutlistProviderClass
 ###
@@ -732,6 +732,8 @@ class CutListAT:
 								cutlist_expire_period, lambda x: Debug(2, x))
 		self.searchCache = FileCache("search", cutoptions.cachedir, self._GetSearchList,
 								search_request_expire_period, lambda x: Debug(2, x))
+		self.commentsCache = FileCache("comments", cutoptions.cachedir, self._GetComments,
+								comments_expire_period, lambda x: Debug(2, x))
 
 	def Get(self, url, user=False):
 		userhash = self.cutoptions.cutlistathash
@@ -760,6 +762,16 @@ class CutListAT:
 		Debug(2, "rate cutlist %s with %d" % (cl_id, rating))
 		url = "rate.php?rate=%s&rating=%d" % (cl_id, rating)
 		return self.Get(url,user=True)
+	
+	def _GetComments(self, filename):
+		url = "http://www.onlinetvrecorder.com/recording_comment.php?shortview=true&filename=%s" % filename
+		Debug(4, "_GetComments: Rufe URL '%s' auf um die Kommentare auszulesen." % url)
+		try:
+			comments = self.opener.open(url).read()
+		except StandardError, e:
+			Debug(1, "_GetComments: Fehler: Konnte URL '%s' nicht aufrufen wegen: %s" % (url,e))
+			return ""
+		return unicode(comments,"windows-1252")
 	
 	#
 	# getView
@@ -797,23 +809,15 @@ class CutListAT:
 					return None
 
 			def printComments(self):
-				url = "http://www.onlinetvrecorder.com/recording_comment.php?shortview=true&filename=%s" % filename
-				Debug(4, "printComments: Rufe URL '%s' auf um die Kommentare auszulesen." % url)
-				try:
-					comments = prov.opener.open(url).read()
-				except:
-					Debug(1, "printComments: Fehler: Konnte URL '%s' nicht aufrufen." % url)
-					return
-				comments = unicode(comments,"windows-1252")
+				comments = prov.commentsCache.get(filename)
 				s_re = u"[<]td [^>]*[>][^<]*[<]b[>](?P<user>[^<]*)[<][/]b[>][^<]*[<]br[>]\s*[<]img [^>]*[>](?P<comment>[^<]*)</td>"
 				comments = re.findall(s_re, comments)
-				Debug(4, "printComments: Rufe URL '%s' auf um die Kommentare auszulesen." % url)
 				if comments:
 					print
 					print "Kommentare (die auf OTR veröffentlicht wurden):"
 					for user, comment in comments:
 						print "  Autor:     %s" % user
-						print "  Kommentar: %s" % comment.strip().replace("\\\\&amp;quot;","\"")
+						print "  Kommentar: %s" % comment.strip().replace("\\\\&amp;quot;","\"").replace("&amp;gt;",">").replace("&amp;ls;","<")
 						print
 				
 		return View()

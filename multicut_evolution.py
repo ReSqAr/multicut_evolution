@@ -768,6 +768,8 @@ class CutListAT:
 		
 		class View:
 			def __init__(self):
+				self.printComments()
+
 				print "Hole Übersicht von cutlist.at..."
 				self.cutlists = prov.ListAll(filename)
 				print "%d Cutlist(s) gefunden" % len(self.cutlists)
@@ -792,6 +794,25 @@ class CutListAT:
 				except:
 					print "Illegale Eingabe."
 					return None
+
+			def printComments(self):
+				url = "http://www.onlinetvrecorder.com/recording_comment.php?shortview=true&filename=%s" % filename
+				try:
+					comments = prov.opener.open(url).read()
+				except:
+					Debug(1, "Fehler: Konnte URL '%s' nicht aufrufen." % url)
+					return
+				comments = unicode(comments,"windows-1252")
+				s_re = u"[<]td [^>]*[>][^<]*[<]b[>](?P<user>[^<]*)[<][/]b[>][^<]*[<]br[>]\s*[<]img [^>]*[>](?P<comment>[^<]*)</td>"
+				comments = re.findall(s_re, comments)
+				if comments:
+					print
+					print "Kommentare:"
+					for user, comment in comments:
+						print "  Autor:     %s" % user
+						print "  Kommentar: %s" % comment.strip()
+						print
+				
 		return View()
 	
 	#

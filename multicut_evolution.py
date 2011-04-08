@@ -798,20 +798,22 @@ class CutListAT:
 
 			def printComments(self):
 				url = "http://www.onlinetvrecorder.com/recording_comment.php?shortview=true&filename=%s" % filename
+				Debug(4, "printComments: Rufe URL '%s' auf um die Kommentare auszulesen." % url)
 				try:
 					comments = prov.opener.open(url).read()
 				except:
-					Debug(1, "Fehler: Konnte URL '%s' nicht aufrufen." % url)
+					Debug(1, "printComments: Fehler: Konnte URL '%s' nicht aufrufen." % url)
 					return
 				comments = unicode(comments,"windows-1252")
 				s_re = u"[<]td [^>]*[>][^<]*[<]b[>](?P<user>[^<]*)[<][/]b[>][^<]*[<]br[>]\s*[<]img [^>]*[>](?P<comment>[^<]*)</td>"
 				comments = re.findall(s_re, comments)
+				Debug(4, "printComments: Rufe URL '%s' auf um die Kommentare auszulesen." % url)
 				if comments:
 					print
 					print "Kommentare (die auf OTR veröffentlicht wurden):"
 					for user, comment in comments:
 						print "  Autor:     %s" % user
-						print "  Kommentar: %s" % comment.strip()
+						print "  Kommentar: %s" % comment.strip().replace("\\\\&amp;quot;","\"")
 						print
 				
 		return View()
@@ -895,7 +897,6 @@ class CutListOwnProvider:
 	
 	def getCutlists(self, filename):
 		precutlists = self.cutlistCache.get(filename)
-		print precutlists
 		precutlists = precutlists.split(self.delimiter) if precutlists else []
 		precutlists = [ cutlist.split('\n',1) for cutlist in precutlists ]
 		cutlists = []

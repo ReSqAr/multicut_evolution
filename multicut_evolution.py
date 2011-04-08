@@ -3,8 +3,8 @@
 
 """
     multicut_evolution -- Eine erweiterte Pythonversion von multicut_light.
-    Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)
-	          (C) 2010  Matthias Kümmerer
+    Copyright (C) 2011  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)
+	          (C) 2011  Matthias Kümmerer
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -163,8 +163,8 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
 """.format(VERSION=multicut_evolution_date,BOLD=C_BOLD,CLEAR=C_CLEAR)
 
 
-print "multicut_evolution.py Copyright (C) 2010  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
-print "                                (C) 2010  Matthias Kümmerer"
+print "multicut_evolution.py Copyright (C) 2011  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
+print "                                (C) 2011  Matthias Kümmerer"
 print "(URL: https://yhjz.de/public/fastforward/multicut_evolution)"
 print "This program comes with ABSOLUTELY NO WARRANTY."
 print
@@ -495,6 +495,7 @@ class CutList:
 					StartInFrames[i] += duration
 					DurationInFrames[i] = -duration
 			self.cutlist_dict["frames"] = zip(StartInFrames, DurationInFrames)
+			
 		return self.cutlist_dict
 		
 	def GetFPS(self):
@@ -807,7 +808,7 @@ class CutListAT:
 				comments = re.findall(s_re, comments)
 				if comments:
 					print
-					print "Kommentare:"
+					print "Kommentare (die auf OTR veröffentlicht wurden):"
 					for user, comment in comments:
 						print "  Autor:     %s" % user
 						print "  Kommentar: %s" % comment.strip()
@@ -850,6 +851,33 @@ class CutListAT:
 				except:
 					print "Illegale Eingabe"
 
+	@staticmethod
+	def UploadCutList(cutlistathash, cutlist):
+		fname = [line for line in cutlist.split('\n') if line.startswith("ApplyToFile=")]
+		if len(fname) != 1:
+			print "Illegale Cutlist, uploaden nicht möglich."
+			return
+		fname = fname[0].split('=',1)[1].strip()
+
+		host = "www.cutlist.at"
+		selector = "/user/%s/" % cutlistathash
+		fields = [ ]
+		files = [ ("userfile[]", fname + '.cutlist', cutlist.replace('\n','\r\n')) ]
+		
+		try:
+			response = post_multipart(host, selector, fields, files)
+		except Exception, e:
+			print "Upload ist fehlgeschlagen: %s" % e
+			return
+
+		Debug(2,"Server-Antwort-Code: %s" % response[0])
+		Debug(2,"Server-Antwort-Grund: %s" % response[1])
+		Debug(2,"Server-Antwort: %s" % response[2])
+		
+		if 'erfolgreich' in response[2].lower():
+			print "Upload war erfolgreich"
+		else:
+			print "Upload ist fehlgeschlagen: %s" % response[2]
 
 ###
 # CutListOwnProvider
@@ -948,40 +976,11 @@ class CutListOwnProvider:
 
 		cutlisttxt = cutlist.GenerateCompleteCutList()
 		if cutlisttxt:
-			self.UploadCutList(cutlisttxt)
+			CutListAT.UploadCutList(self.cutoptions.cutlistathash. cutlisttxt)
 		else:
 			print
 			print "Vorgang abgebrochen, die Cutlist wird nicht hochgeladen!"
 			print
-
-	def UploadCutList(self, cutlist):
-		fname = [line for line in cutlist.split('\n') if line.startswith("ApplyToFile=")]
-		if len(fname) != 1:
-			print "Illegale Cutlist, uploaden nicht möglich."
-			return
-		fname = fname[0].split('=',1)[1].strip()
-
-		host = "www.cutlist.at"
-		selector = "/user/%s/" % self.cutoptions.cutlistathash
-		fields = [ ]
-		files = [ ("userfile[]", fname + '.cutlist', cutlist.replace('\n','\r\n')) ]
-		
-		try:
-			response = post_multipart(host, selector, fields, files)
-		except Exception, e:
-			print "Upload ist fehlgeschlagen: %s" % e
-			return
-
-		Debug(2,"Server-Antwort-Code: %s" % response[0])
-		Debug(2,"Server-Antwort-Grund: %s" % response[1])
-		Debug(2,"Server-Antwort: %s" % response[2])
-		
-		if 'erfolgreich' in response[2].lower():
-			print "Upload war erfolgreich"
-		else:
-			print "Upload ist fehlgeschlagen: %s" % response[2]
-		
-
 
 ###
 # CutListFileProvider
@@ -1324,7 +1323,7 @@ class CutFile:
 						except:
 							cutlist = self.cutlist.GenerateRawCutList()
 						print "Cutlist:"
-						for line in cutlist.split('\n'):
+						for line in cutlist.strip().split('\n'):
 							print ">", line
 						print
 					self.cutlist = None

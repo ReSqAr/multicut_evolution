@@ -644,8 +644,9 @@ class CutList:
 			errorline = ""
 
 		outtxt = \
-			("@RED {n} @CLEAR	Schnitte:  @BLUE {cuts} @CLEAR ({cutsformat})	Spielzeit: @BLUE {duration} @CLEAR (hh:mm:ss)\n" \
-			+ "@BLACK{meta}@CLEAR	Bewertung: @BLUE {rating} ({c}/{dl}) @CLEAR    	Autor:     @BLUE {author} ({arating}) @CLEAR\n").format(
+			(u"@RED {n} @CLEAR	Schnitte:  @BLUE {cuts} @CLEAR ({cutsformat})	Spielzeit: @BLUE {duration} @CLEAR (hh:mm:ss)\n" \
+			+ u"@BLACK{meta}@CLEAR	Bewertung: @BLUE {rating} ({c}/{dl}) @CLEAR    	Autor:     @BLUE {author} ({arating}) @CLEAR\n")\
+			.format(
 					n=number, cuts=cuts, cutsformat=cutsformat, duration=duration,
 						meta=meta, rating=rating, c=self.attr["ratingcount"], dl=self.attr["downloadcount"], 
 						author=author, arating=self.attr["ratingbyauthor"]
@@ -1643,6 +1644,8 @@ def main():
 						del cutfiles[avi]
 			except StandardError, e:
 				print "Ein Fehler ist aufgetreten, die Datei wird nicht geschnitten: %s" % e
+				Debug(1, traceback.format_exc())
+
 		print
 		print
 		print "%s Cutlists umwählen: %s" % (C_RED, C_CLEAR)

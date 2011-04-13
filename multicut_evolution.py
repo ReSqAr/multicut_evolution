@@ -1287,7 +1287,7 @@ class CutFile:
 				else:
 					print "Es wurden keine weiteren Provider gefunden."
 					print "Datei wird nicht geschnitten, da keine Cutlist gefunden wurde."
-					raise StandardError("Could not find suitable provider...")
+					return False
 					
 			inp = raw_input("Auswahl/Test: ").strip()
 			print

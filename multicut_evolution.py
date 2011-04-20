@@ -1362,12 +1362,11 @@ class CutFile:
 		project = projectclass(self, self.cutlist, self.cutoptions)
 		
 		print "Schneide mit %s" % project.Name()
-		print "Framerate: %g fps" % self.cutlist.GetFPS()
 		
 		start = time.time()
 		project.Run() # run
 		end = time.time()
-		print "Fertig, benötigte Zeit: %ds" % int(end-start)
+		print "Fertig, benötigte Zeit: %ds" % int(end-start+0.5)
 			
 		if os.path.isfile(self.tmppath):
 			shutil.move(self.path, self.uncutpath)

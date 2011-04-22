@@ -163,9 +163,9 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
 """.format(VERSION=multicut_evolution_date,BOLD=C_BOLD,CLEAR=C_CLEAR)
 
 
-print "multicut_evolution.py Copyright (C) 2011  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)"
+print "multicut_evolution.py Copyright (C) 2011  Yasin Zähringer (yasinzaehringer+dev@yhjz.de)"
 print "                                (C) 2011  Matthias Kümmerer"
-print "(URL: https://yhjz.de/public/fastforward/multicut_evolution)"
+print "(URL: https://www.yhjz.de/www/linux/prog/multicut_evolution.html)"
 print "This program comes with ABSOLUTELY NO WARRANTY."
 print
 

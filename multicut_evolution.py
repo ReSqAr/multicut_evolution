@@ -1301,7 +1301,7 @@ class CutFile:
 			print
 			
 			if inp.lower() == "delete" or unicode(inp.lower(),'utf8') == u"löschen":
-				s = raw_input("Soll die Datei gelöscht werden? [j/N]").strip()
+				s = raw_input("Soll die Datei gelöscht werden? [j/N] ").strip()
 				if s.lower() == 'j':
 					print "%s Lösche %s %s" % (C_RED, self.path, C_CLEAR)
 					try:	os.remove(self.path)
@@ -1403,7 +1403,7 @@ class CutFile:
 		print
 		s = raw_input("Annehmen? [J/n]: ").strip()
 		if 'n' in s.lower():
-			s = raw_input("Soll die geschnitte Datei gelöscht und die Originaldatei wiederhergestellt werden? [J/n]").strip()
+			s = raw_input("Soll die geschnitte Datei gelöscht und die Originaldatei wiederhergestellt werden? [J/n] ").strip()
 			if not 'n' in s.lower():
 				print "%s Lösche %s %s" % (C_RED, self.cutpath, C_CLEAR)
 				try:	os.remove(self.cutpath)

@@ -1300,6 +1300,17 @@ class CutFile:
 			inp = raw_input("Auswahl/Test: ").strip()
 			print
 			
+			if inp.lower() == "delete" or unicode(inp.lower(),'utf8') == u"löschen":
+				s = raw_input("Soll die Datei gelöscht werden? [j/N]").strip()
+				if s.lower() == 'j':
+					print "%s Lösche %s %s" % (C_RED, self.path, C_CLEAR)
+					try:	os.remove(self.path)
+					except: print "Datei konnte nicht gelöscht werden."
+					return False
+				print
+				continue
+
+			
 			if not inp:
 				print "Datei wird nicht geschnitten"
 				return False

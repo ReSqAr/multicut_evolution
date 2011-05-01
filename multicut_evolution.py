@@ -64,17 +64,21 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         Geschnittene Dateien werden nicht zur Überprüfung
         wiedergegeben.
 
-    -i, --only_internet
+    -i, --only-internet
         Falls online keine Cutlist gefunden werden kann, wird nicht
         danach gefragt, ob der Benutzer eine eigene anlegen will.
 
-    -o, --no_internet, --offline
-        Es wird nicht online nach Cutlists gesucht.
+    -o, --no-internet, --offline
+        Es wird nicht online nach Cutlists gesucht und es werden keine
+        Kommentare von OnlineTVRecorder geladen.
+
+    -c, --no-comments
+        Es werden keine Kommentare von OnlineTVRecorder geladen.
 
     --config $name
         Gibt den Namen der zu verwendenden Konfigurationsdatei an.
         [default: ~/.multicut_evolution.conf]
-    
+
     --verbosity $d
         Debuginformationen werden entsprechend ausgegeben.
         [default: 0, maximal 5]
@@ -810,6 +814,8 @@ class CutListAT:
 					return None
 
 			def printComments(self):
+				if prov.cutoptions.no_internet or prov.cutoptions.no_comments:
+					return
 				comments = prov.commentsCache.get(filename)
 				s_re = u"[<]td [^>]*[>][^<]*[<]b[>](?P<user>[^<]*)[<][/]b[>][^<]*[<]br[>]\s*[<]img [^>]*[>](?P<comment>[^<]*)</td>"
 				comments = re.findall(s_re, comments)
@@ -1114,6 +1120,7 @@ class CutOptions:
 		self.author  = pwd.getpwuid(os.getuid())[0]
 		self.only_internet = cmd_options["only_internet"] if "only_internet" in cmd_options else False
 		self.no_internet = cmd_options["no_internet"] if "no_internet" in cmd_options else False
+		self.no_comments = cmd_options["no_comments"] if "no_comments" in cmd_options else False
 		self.cutlistathash = ""
 		
 		self.cmd_VirtualDub = None
@@ -1557,9 +1564,16 @@ class VDProjectClass:
 ###
 def main():
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "hnio",
-						["help", "nocheck", "only_internet","no_internet", "offline",
-						"config=","verbosity="])
+		opts, args = getopt.getopt(sys.argv[1:], "hnioc",
+						["help",
+							"nocheck",
+							"only-internet",
+							"no-internet","offline",
+							"no-comments",
+							"config=",
+							"verbosity="
+						]
+					)
 	except getopt.GetoptError, err:
 		print C_RED + str(err) + C_CLEAR # will print something like "option -a not recognized"
 		print
@@ -1574,10 +1588,12 @@ def main():
 		if o in ("-h", "--help"):
 			print prog_help
 			sys.exit()
-		elif o in ("-i", "--only_internet",):
+		elif o in ("-i", "--only-internet",):
 			cmd_options["only_internet"] = True
-		elif o in ("-o","no_internet", "offline",):
+		elif o in ("-o","no-internet", "offline",):
 			cmd_options["no_internet"] = True
+		elif o in ("-c","no-comments",):
+			cmd_options["no_comments"] = True
 		elif o in ("-n", "--nocheck",):
 			check_cut_files = False
 		elif o in ("--config",):

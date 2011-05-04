@@ -949,7 +949,7 @@ class CutListOwnProvider:
 		class View:
 			def __init__(self):
 				self.cutlists = prov.getCutlists(filename)
-				print "%d Cutlist(s) wurde(n) schon von Ihnen (für diese Datei) erstellt" % len(self.cutlists)
+				print "%d Cutlist(s) wurde(n) schon von Ihnen für diese Datei erstellt" % len(self.cutlists)
 
 				for i, cutlist in enumerate(self.cutlists):
 					print "[%2d] Cutlist: %s" % (i+1,cutlist[0])
@@ -1261,6 +1261,9 @@ class CutOptions:
 		raise ValueError("'%s' is not valid" % name)
 
 
+class DeletedException(StandardError):
+	pass
+
 ###
 # CutFile Class
 ###
@@ -1304,9 +1307,12 @@ class CutFile:
 				s = raw_input("Soll die Datei gelöscht werden? [j/N] ").strip()
 				if s.lower() == 'j':
 					print "%s Lösche %s %s" % (C_RED, self.path, C_CLEAR)
-					try:	os.remove(self.path)
-					except: print "Datei konnte nicht gelöscht werden."
-					return False
+					try:
+						os.remove(self.path)
+						raise DeletedException()
+					except OSError:
+						print "Datei konnte nicht gelöscht werden."
+						return False
 				print
 				continue
 
@@ -1673,7 +1679,7 @@ def main():
 		print "%s Cutlists auswählen für %d Datei(en): %s" %(C_RED, len(avis2Choose), C_CLEAR)
 		print
 		
-		for avi in avis2Choose:
+		for avi in avis2Choose[:]:
 			try:
 				c = CutFile(avi, o)
 				if c.ChooseCutList():
@@ -1681,9 +1687,17 @@ def main():
 				else:
 					if avi in cutfiles:
 						del cutfiles[avi]
+			except DeletedException:
+				avis.remove(avi)
 			except StandardError, e:
 				print "Ein Fehler ist aufgetreten, die Datei wird nicht geschnitten: %s" % e
 				Debug(1, traceback.format_exc())
+
+		if not avis:
+			print
+			print "Keine Datei zum Schneiden gefunden."
+			return
+			
 
 		print
 		print

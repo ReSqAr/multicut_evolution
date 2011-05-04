@@ -3,7 +3,7 @@
 
 """
     multicut_evolution -- Eine erweiterte Pythonversion von multicut_light.
-    Copyright (C) 2011  Yasin Zähringer (yasinzaehringer+mutlicut@yhjz.de)
+    Copyright (C) 2011  Yasin Zähringer (yasinzaehringer+dev@yhjz.de)
 	          (C) 2011  Matthias Kümmerer
 
     This program is free software: you can redistribute it and/or modify
@@ -989,7 +989,7 @@ class CutListOwnProvider:
 
 		cutlisttxt = cutlist.GenerateCompleteCutList()
 		if cutlisttxt:
-			CutListAT.UploadCutList(self.cutoptions.cutlistathash. cutlisttxt)
+			CutListAT.UploadCutList(self.cutoptions.cutlistathash, cutlisttxt)
 		else:
 			print
 			print "Vorgang abgebrochen, die Cutlist wird nicht hochgeladen!"

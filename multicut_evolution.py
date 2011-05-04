@@ -1395,13 +1395,13 @@ class CutFile:
 			print "Schneiden war nicht erfolgreich"
 			return False
 	
-	def ShowCut(self):		
+	def ValidateCut(self):		
 		print "%s Prüfe %s %s" % (C_RED, self.filename, C_CLEAR)
 		self.cutlist.ShowCuts(self.cutpath, is_filecut = True, tempdir = self.cutoptions.tempdir)
 		self.cutlist.PostProcessCutList()
 		
 		print
-		s = raw_input("Annehmen? [J/n]: ").strip()
+		s = raw_input("Soll die geschnitte Datei angenommen werden? [J/n]: ").strip()
 		if 'n' in s.lower():
 			s = raw_input("Soll die geschnitte Datei gelöscht und die Originaldatei wiederhergestellt werden? [J/n] ").strip()
 			if not 'n' in s.lower():
@@ -1409,6 +1409,8 @@ class CutFile:
 				try:	os.remove(self.cutpath)
 				except: pass # doesn't matter
 				shutil.move(self.uncutpath, self.path)
+				return False
+		return True
 					
 	def GetAspect(self):
 		out = Run("mplayer",  ["-vo", "null", "-nosound", "-frames", "1", self.path])[0]
@@ -1721,6 +1723,11 @@ def main():
 	cutfiles = cutfiles.values()
 	cutfiles.sort(key=lambda x: x.filename)
 	
+	if not cutfiles:
+		print
+		print "Keine Datei zum Schneiden angegeben."
+		return
+	
 	###
 	# cut files
 	###
@@ -1779,6 +1786,8 @@ def main():
 		print
 		print
 		print "%s Schnitte überprüfbar von insgesamt %d Datei(en): %s" %(C_RED_UNDERLINE, len(checkfiles), C_CLEAR)
+		print "Um die Cutlist, mit der einer dieser Film geschnitten wurde, hochzuladen, müssen Sie"
+		print "zuerst die Schnitte überprüfen. Anschließend wird Ihnen diese Möglichkeit gegeben."
 		print
 		print
 		
@@ -1832,12 +1841,14 @@ def main():
 			if avis2Check == None:
 				break
 
-			for i,c_n in enumerate(avis2Check):
+			for i,c_n in enumerate(avis2Check[:]):
 				print
 				print
 				print "%d von %d" % (i+1, len(avis2Check))
-				c_n[0].ShowCut()	
-				c_n[1] += 1
+				if c_n[0].ValidateCut(): # file was NOT deleted
+					c_n[1] += 1
+				else: # file was deleted
+					checkfiles.remove(c_n)
 
 
 if __name__ == '__main__':

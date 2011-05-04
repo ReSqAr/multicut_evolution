@@ -839,6 +839,7 @@ class CutListAT:
 			
 		print
 		print "@RED Bitte eine Bewertung für die Cutlist abgeben... @CLEAR".replace("@RED", C_RED).replace("@CLEAR", C_CLEAR)
+		print "Mit einer leeren Einagabe überspringen Sie die Bewertung."
 		print "[0] Dummy oder keine Cutlist"
 		print "[1] Anfang und Ende grob geschnitten"
 		print "[2] Anfang und Ende halbwegs genau geschnitten"
@@ -1391,7 +1392,7 @@ class CutFile:
 		print
 		s = raw_input("Annehmen? [J/n]: ").strip()
 		if 'n' in s.lower():
-			s = raw_input("Sind Sie sicher, dass die geschnitte Datei gelöscht werden soll? [J/n]").strip()
+			s = raw_input("Soll die geschnitte Datei gelöscht und die Originaldatei wiederhergestellt werden? [J/n]").strip()
 			if not 'n' in s.lower():
 				print "%s Lösche %s %s" % (C_RED, self.cutpath, C_CLEAR)
 				try:	os.remove(self.cutpath)
@@ -1583,6 +1584,7 @@ def main():
 		print prog_help
 		sys.exit(2)
 	
+	failure = False
 	check_cut_files = True
 	configfile = "~/.multicut_evolution.conf"
 	cmd_options = {}
@@ -1602,12 +1604,18 @@ def main():
 		elif o in ("--config",):
 			configfile = a
 		elif o in ("--verbosity",):
-			global VERBOSITY_LEVEL
-			VERBOSITY_LEVEL = int(a)
-			print "Setze verbosity auf %d" % VERBOSITY_LEVEL
+			try:
+				global VERBOSITY_LEVEL
+				VERBOSITY_LEVEL = int(a)
+				print "Setze verbosity auf %d" % VERBOSITY_LEVEL
+			except:
+				print "Parameter (%s) von '--verbosity' fehlerhaft." % a
+				failure = True
+				break
 	
-	if not args:
-		print C_RED + "Fehler: Keine Dateien übergeben" + C_CLEAR
+	if failure or not args:
+		if not args:
+			print C_RED + "Fehler: Keine Dateien übergeben" + C_CLEAR
 		print
 		print prog_help
 		sys.exit()
@@ -1744,7 +1752,10 @@ def main():
 				print
 	except:
 		print "Fehler während dem Anzeigen von Fehlern..."
-		
+	
+	###
+	# check files
+	###
 	if check_cut_files:
 		###
 		# show files

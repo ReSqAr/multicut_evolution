@@ -43,7 +43,7 @@ C_BLACK			= "\033[40;37;1m"
 C_RED_UNDERLINE	= "\033[41;37;1;4m"
 C_BOLD			= "\033[1m"
 
-multicut_evolution_date = "08.04.2011"
+multicut_evolution_date = "15.05.2011"
 prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
@@ -74,6 +74,9 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
 
     -c, --no-comments
         Es werden keine Kommentare von OnlineTVRecorder geladen.
+
+    -s, --no-suggestions
+        Dateinamenvorschläge von Cutlists werden nicht berücksichtigt.
 
     --config $name
         Gibt den Namen der zu verwendenden Konfigurationsdatei an.
@@ -139,24 +142,29 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
             [default: avidemux2_qt4]
         cachedir=
             Pfad zu Cache [default: ~/.cache/mutlicut/]
-            Ein leerer Pfad bedeutet kein Cachen.
+            Ein leerer Pfad bedeutet kein cachen.
         vorlauf=
             Vorlauf bei der Überprüfung [default: 10]
         nachlauf=
             Nachlauf bei der Überprüfung [default: 5]
-        bewerten=
-            Gibt an, ob nach einer Wertung gefragt werden soll. [default:1]
+        review=
+            Gibt an, ob nach einer Wertung gefragt werden soll. [default: true]
         cutname=
             Ausdruck für Ausgabename (s.u.) [default: {{base}}-cut{{rating}}.{{ext}}]
         uncutname=
             Ausdruck für Ausgabename (s.u.) [default: {{full}}]
-        autor=
+        author=
             Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
             wird. [default: Terminalbenutzername]
         cutlistathash=
             Cutlist.at-Benutzerhash, also nicht die gesamte URL sondern nur den Hash
             [default: leer]
+        comments=
+            Kommentare von OnlineTVRecorder werden angezeigt. [default: true]
+        suggestions=
+            Dateinamenvorschläge von Cutlists werden berücksichtigt. [default: true]
 
+            
     Beschreibung der Sprache für die Namensgebung von Dateien:
     (siehe auch cutname=, uncutname=)
         {{base}}       Dateiname ohne Endung
@@ -167,7 +175,7 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
 """.format(VERSION=multicut_evolution_date,BOLD=C_BOLD,CLEAR=C_CLEAR)
 
 
-print "multicut_evolution.py Copyright (C) 2011  Yasin Zähringer (yasinzaehringer+dev@yhjz.de)"
+print "multicut_evolution.py Copyright (C) 2010-2011  Yasin Zähringer (yasinzaehringer+dev@yhjz.de)"
 print "                                (C) 2011  Matthias Kümmerer"
 print "(URL: https://www.yhjz.de/www/linux/prog/multicut_evolution.html)"
 print "This program comes with ABSOLUTELY NO WARRANTY."
@@ -475,6 +483,9 @@ class CutList:
 			# extract file
 			try: self.cutlist_dict["file"] = re.search("ApplyToFile=(?P<value>.*)", cutlisttxt).group('value').strip()
 			except: print "Conversion: Filename not found:\n%s" % cutlisttxt
+			# extract suggested file name
+			try: self.cutlist_dict["suggested"] = re.search("SuggestedMovieName=(?P<value>.*)", cutlisttxt).group('value').strip()
+			except: print "Conversion: SuggestedMovieName not found:\n%s" % cutlisttxt
 			# extract file size
 			try: self.cutlist_dict["size"] = int( re.search("OriginalFileSizeBytes=(?P<value>[-0-9.]*)", cutlisttxt).group('value') )
 			except: print "Conversion: Filesize not found:\n%s" % cutlisttxt
@@ -502,7 +513,10 @@ class CutList:
 			self.cutlist_dict["frames"] = zip(StartInFrames, DurationInFrames)
 			
 		return self.cutlist_dict
-		
+	
+	def GetCutListDict(self):
+		return self.__GetCutList()
+	
 	def GetFPS(self):
 		return self.__GetCutList()["fps"]
 
@@ -1122,6 +1136,7 @@ class CutOptions:
 		self.only_internet = cmd_options["only_internet"] if "only_internet" in cmd_options else False
 		self.no_internet = cmd_options["no_internet"] if "no_internet" in cmd_options else False
 		self.no_comments = cmd_options["no_comments"] if "no_comments" in cmd_options else False
+		self.no_suggestions = cmd_options["no_suggestions"] if "no_suggestions" in cmd_options else False
 		self.cutlistathash = ""
 		
 		self.cmd_VirtualDub = None
@@ -1140,7 +1155,7 @@ class CutOptions:
 		if configfile:
 			print "Parse Konfigurationsdatei: %s" % configfile
 			self.ParseConfig(configfile)
-
+		
 		# enforce ending seperator
 		if not self.tempdir.endswith(os.sep):  self.tempdir  += os.sep
 		if not self.cutdir.endswith(os.sep):   self.cutdir   += os.sep
@@ -1216,8 +1231,6 @@ class CutOptions:
 						self.cmd_VirtualDub = os.path.expanduser(opt)
 					elif cmd == 'avidemux_gui':
 						self.cmd_AviDemux_Gui = os.path.expanduser(opt)
-					elif cmd == 'avidemux_saveworkbench':
-						self.aviDemux_saveWorkbench = (opt=='True' or opt=='1')
 					elif cmd == "cachedir":
 						self.cachedir= os.path.expanduser(opt)
 
@@ -1225,17 +1238,25 @@ class CutOptions:
 						self.cutnameformat = opt
 					elif cmd == "uncutname":
 						self.uncutnameformat = opt
+					elif cmd == "author":
+						self.author = opt
+					elif cmd == "cutlistathash":
+						self.cutlistathash = opt
+
 					elif cmd == "vorlauf":
 						self.time_before_cut = int(opt)
 					elif cmd == "nachlauf":
 						self.time_after_cut  = int(opt)
-					elif cmd == "bewerten":
+					elif cmd == "review":
 						self.do_rate = int(opt)
-					elif cmd == "autor":
-						self.author = opt
-					elif cmd == "cutlistathash":
-						self.cutlistathash = opt
-					
+
+					elif cmd == 'avidemux_saveworkbench':
+						self.aviDemux_saveWorkbench = (opt.lower()=='true' or opt=='1')
+					elif cmd == 'comments':
+						self.no_comments = (opt.lower()=='false' or opt=='0')
+					elif cmd == 'suggestions':
+						self.no_suggestions = (opt.lower()=='false' or opt=='0')
+
 				except StandardError, e:
 					print "ConfigParse: Could not parse '%s' due to:" % line
 					print e
@@ -1360,15 +1381,31 @@ class CutFile:
 					self.cutlist = None
 				else:
 					print "Keine Cutlist angegeben!"
+		
+		# set names
+		self.cutname = self.cutoptions.FormatString("cutname", (self.cutlist, self.filename))
+		self.tmpname = "$$$$-" + self.cutname 
+		self.uncutname = self.cutoptions.FormatString("uncutname", (self.cutlist, self.filename))
 
+		if not self.cutoptions.no_suggestions:
+			cutlist_dict = self.cutlist.GetCutListDict()
+			suggested = cutlist_dict['suggested'].strip() if 'suggested' in cutlist_dict else None
+			if suggested:
+				if not suggested.endswith('.avi'):
+					suggested += '.avi'
+				print
+				print "Die Cutlist enthält einen Dateinamenvorschlag:"
+				print "    [c] %s" %suggested
+				print "    [g] %s (generischer Vorschlag)" % self.cutname
+				inp = raw_input("Wollen Sie den [g]enerischen Vorschlag (Standard) oder den [c]utlist-Vorschlag benutzen? ").strip()
+				if inp.lower() == 'c':
+					self.cutname = suggested
+					print "Benutze '%s'" % self.cutname
+		
 		return True
 
 
 	def Cut(self):
-		self.cutname = self.cutoptions.FormatString("cutname", (self.cutlist, self.filename))
-		self.tmpname = "$$$$-" + self.cutname 
-		self.uncutname = self.cutoptions.FormatString("uncutname", (self.cutlist, self.filename))
-		
 		self.cutpath = self.cutoptions.cutdir + self.cutname
 		self.tmppath = self.cutoptions.cutdir + self.tmpname
 		self.uncutpath = self.cutoptions.uncutdir + self.uncutname
@@ -1587,12 +1624,13 @@ class VDProjectClass:
 ###
 def main():
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "hnioc",
+		opts, args = getopt.getopt(sys.argv[1:], "hniocs",
 						["help",
 							"nocheck",
 							"only-internet",
 							"no-internet","offline",
 							"no-comments",
+							"no-suggestions",
 							"config=",
 							"verbosity="
 						]
@@ -1607,7 +1645,7 @@ def main():
 	check_cut_files = True
 	configfile = "~/.multicut_evolution.conf"
 	cmd_options = {}
-	
+
 	for o, a in opts:
 		if o in ("-h", "--help"):
 			print prog_help
@@ -1618,6 +1656,8 @@ def main():
 			cmd_options["no_internet"] = True
 		elif o in ("-c","no-comments",):
 			cmd_options["no_comments"] = True
+		elif o in ("-s","no-suggestions",):
+			cmd_options["no_suggestions"] = True
 		elif o in ("-n", "--nocheck",):
 			check_cut_files = False
 		elif o in ("--config",):

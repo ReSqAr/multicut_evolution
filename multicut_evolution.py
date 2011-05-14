@@ -1142,6 +1142,7 @@ class CutOptions:
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
 		self.aviDemux_saveWorkbench = True
+		self.do_rate = True
 		
 		self.cutnameformat = "{base}-cut{rating}.{ext}"
 		self.uncutnameformat = "{full}"
@@ -1149,8 +1150,6 @@ class CutOptions:
 		self.time_before_cut = 10
 		self.time_after_cut  = 5
 		
-		self.do_rate = 1
-
 		# parse
 		if configfile:
 			print "Parse Konfigurationsdatei: %s" % configfile
@@ -1247,11 +1246,11 @@ class CutOptions:
 						self.time_before_cut = int(opt)
 					elif cmd == "nachlauf":
 						self.time_after_cut  = int(opt)
-					elif cmd == "review":
-						self.do_rate = int(opt)
 
+					elif cmd == "review":
+						self.do_rate = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'avidemux_saveworkbench':
-						self.aviDemux_saveWorkbench = (opt.lower()=='true' or opt=='1')
+						self.aviDemux_saveWorkbench = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'comments':
 						self.no_comments = (opt.lower()=='false' or opt=='0')
 					elif cmd == 'suggestions':

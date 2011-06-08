@@ -163,6 +163,9 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
             Kommentare von OnlineTVRecorder werden angezeigt. [default: true]
         suggestions=
             Dateinamenvorschläge von Cutlists werden berücksichtigt. [default: true]
+	convertmkv=
+	    Bestimmt, ob die geschnittene AVI-Datei danach noch in MKV kopiert
+	    werden soll. [default: false]
 
             
     Beschreibung der Sprache für die Namensgebung von Dateien:
@@ -1143,6 +1146,7 @@ class CutOptions:
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
 		self.aviDemux_saveWorkbench = True
 		self.do_rate = True
+		self.convertmkv = False
 		
 		self.cutnameformat = "{base}-cut{rating}.{ext}"
 		self.uncutnameformat = "{full}"
@@ -1255,6 +1259,8 @@ class CutOptions:
 						self.no_comments = (opt.lower()=='false' or opt=='0')
 					elif cmd == 'suggestions':
 						self.no_suggestions = (opt.lower()=='false' or opt=='0')
+					elif cmd == 'convertmkv':
+						self.convertmkv = not (opt.lower()=='false' or opt=='0')
 
 				except StandardError, e:
 					print "ConfigParse: Could not parse '%s' due to:" % line
@@ -1436,6 +1442,15 @@ class CutFile:
 		else:
 			print "Schneiden war nicht erfolgreich"
 			return False
+
+	def ConvertMkv(self):
+		self.mkvpath = os.path.splitext(self.cutpath)[0] + '.mkv'
+		print "\nKonvertiere nach mkv"
+		start = time.time()
+		mkvcmd = ['mkvmerge', '-o', self.mkvpath, '--compression', '-1:none', self.cutpath]
+		subprocess.Popen(mkvcmd).wait()
+		end = time.time()
+		print "Konvertieren abgeschlossen, benötigte Zeit: %ds" % int(end-start+.5)
 	
 	def ValidateCut(self):		
 		print "%s Prüfe %s %s" % (C_RED, self.filename, C_CLEAR)
@@ -1689,7 +1704,6 @@ def main():
 	
 	o = CutOptions(configfile,cmd_options)
 
-
 	###
 	# choose cutlists
 	###
@@ -1816,6 +1830,14 @@ def main():
 			print "Life has to go on..."
 			
 			errors.append( (e,c) )
+		if o.convertmkv:
+			try:
+				c.ConvertMkv()
+			except StandardError,e:
+				print e
+				print "Stacktrace:"
+				traceback.print_exc()
+				print "There is still something to do..."
 	
 	try:
 		if errors:

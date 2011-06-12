@@ -195,7 +195,7 @@ Avidemux in beliebiger Version
 Wine in beliebiger Version
 VirtualDub Version 1.7.8.28346
     http://sourceforge.net/projects/virtualdub/files/virtualdub-win/1.7.8.28346/
-ffdshow Revision 2496
+ffdshow Revision 2946
     http://sourceforge.net/projects/ffdshow-tryout/files/SVN%20builds%20by%20clsid/ffdshow_rev2946_20090515_clsid.exe
 mkvmerge in beliebiger Version
     Debian Paket: mkvtoolnix; für eigene Experimente ist mkvtoolnix-gui noch ganz angenehm

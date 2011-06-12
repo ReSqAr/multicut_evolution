@@ -1736,7 +1736,7 @@ def main():
 		if o in ("-h", "--help"):
 			print prog_help
 			sys.exit()
-		elif o in ("--inst-help"):
+		elif o in ("--inst-help",):
 			print prog_inst_help
 			sys.exit()
 		elif o in ("-i", "--only-internet",):

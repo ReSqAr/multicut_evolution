@@ -3,8 +3,9 @@
 
 """
     multicut_evolution -- Eine erweiterte Pythonversion von multicut_light.
-    Copyright (C) 2011  Yasin Zähringer (yasinzaehringer+dev@yhjz.de)
-	          (C) 2011  Matthias Kümmerer
+    Copyright (C) 2010-2011  Yasin Zähringer (yasinzaehringer+dev@yhjz.de)
+              (C) 2011  Matthias Kümmerer
+              (C) 2011  Felix Lenders
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -216,7 +217,8 @@ Danach Einstellungen setzen wie in obigem Forenbeitrag dargestellt.
 
 print "multicut_evolution.py Copyright (C) 2010-2011  Yasin Zähringer (yasinzaehringer+dev@yhjz.de)"
 print "                                (C) 2011  Matthias Kümmerer"
-print "(URL: https://www.yhjz.de/www/linux/prog/multicut_evolution.html)"
+print "                                (C) 2011  Felix Lenders"
+print "(URL: http://www.yhjz.de/www/linux/prog/multicut_evolution.html)"
 print "This program comes with ABSOLUTELY NO WARRANTY."
 print
 

@@ -134,6 +134,7 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         einige Angaben vor dem Hochladen abgefragt. Allerdings ist Hochladen nur
         möglich, wenn der Cutlist.at-Benutzerhash angegeben wurde.
 
+
 {BOLD}Konfigurationsdatei{CLEAR}
     In der Konfigurationsdatei zur Verfügung stehenden Einstellungen (der
     Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):

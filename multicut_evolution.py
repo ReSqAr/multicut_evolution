@@ -169,6 +169,10 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
             Kommentare von OnlineTVRecorder werden angezeigt. [default: true]
         suggestions=
             Dateinamenvorschläge von Cutlists werden berücksichtigt. [default: true]
+        useac3=
+            Bestimmt, ob AC3 sofern vorhanden in die HD-AVI gemuxt werden soll.
+            Im Moment sehr experimentell! [default: false]
+
 	convertmkv=
 	    Bestimmt, ob die geschnittene AVI-Datei danach noch in MKV kopiert
 	    werden soll. [default: false]
@@ -199,6 +203,8 @@ ffdshow Revision 2946
     http://sourceforge.net/projects/ffdshow-tryout/files/SVN%20builds%20by%20clsid/ffdshow_rev2946_20090515_clsid.exe
 mkvmerge in beliebiger Version
     Debian Paket: mkvtoolnix; für eigene Experimente ist mkvtoolnix-gui noch ganz angenehm
+ac3fix: Zum Reparieren beschädigter Ac3-Dateien
+    http://www.videohelp.com/tools/AC3Fix
 
 {BOLD}Avidemux Einstellungen{CLEAR}
 Hier musste etwas gemacht werden, aber ich habe wieder vergessen was. Hat mir damals Matthias gezeigt.
@@ -1187,6 +1193,7 @@ class CutOptions:
 		self.do_rate = True
 		self.convertmkv = False
 		self.delavi = False
+		self.useac3 = True
 		
 		self.cutnameformat = "{base}-cut{rating}.{ext}"
 		self.uncutnameformat = "{full}"
@@ -1299,6 +1306,8 @@ class CutOptions:
 						self.no_comments = (opt.lower()=='false' or opt=='0')
 					elif cmd == 'suggestions':
 						self.no_suggestions = (opt.lower()=='false' or opt=='0')
+					elif cmd == 'useac3':
+						self.useac3 = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'convertmkv':
 						self.convertmkv = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'delavi':
@@ -1487,10 +1496,15 @@ class CutFile:
 			return False
 
 	def ConvertMkv(self):
+		if os.path.splitext(self.cutpath)[1].lower() == '.ac3':
+			return
 		self.mkvpath = os.path.splitext(self.cutpath)[0] + '.mkv'
+		ac3path = os.path.splitext(self.cutpath)[0] + '.ac3'
 		print "\n%s Konvertiere %s %s" % (C_RED, self.cutpath, C_CLEAR)
 		start = time.time()
 		mkvcmd = ['mkvmerge', '-o', self.mkvpath, '--compression', '-1:none', self.cutpath]
+		if os.path.exists(ac3path):
+			mkvcmd += [ac3path]
 		subprocess.Popen(mkvcmd).wait()
 		end = time.time()
 		print "Konvertieren abgeschlossen, benötigte Zeit: %ds" % int(end-start+.5)
@@ -1629,8 +1643,23 @@ class VDProjectClass:
 		StartInFrames, DurationInFrames = self.cutlist.TimesInFrames()
 		for start, duration in zip(StartInFrames, DurationInFrames):
 			self.Append("VirtualDub.subset.AddRange(%d,%d);" % (start, duration))
-			
+
 		self.End(self.cutfile.tmppath)
+		self.prepareAC3()
+
+	def prepareAC3(self):
+		self.ffmpegcmd = None
+		if self.cutoptions.useac3:
+			if self.cutfile.GetQuality() == 'H+':
+				ac3source = os.path.splitext(self.cutfile.path)[0] + '.ac3'
+				ac3target = os.path.splitext(self.cutfile.cutpath)[0] + '.ac3'
+				if os.path.exists(ac3source):
+					Starts, Durations = self.cutlist.TimesInSeconds()
+					if len(Starts)>1:
+						print "More than 1 cut for ac3! Not yet implementet!"
+						return
+					self.ffmpegcmd = ['ffmpeg', '-y', '-i', ac3source, '-ss', '%f' % Starts[0],
+						'-t', '%f' % Durations[0], '-ab', '256k', ac3target]
 
 	def Name(self):
 		return "VirtualDub"
@@ -1702,7 +1731,9 @@ class VDProjectClass:
 			if 'fixme:avifile:AVIFileExit' in errtext:
 				sub.send_signal(9) # python >=2.6(?)
 				break
-
+		if self.ffmpegcmd:
+			print "Starting ffmpeg"
+			subprocess.Popen(self.ffmpegcmd, stdout = subprocess.PIPE).wait()
 
 ###
 # main function

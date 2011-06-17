@@ -1355,7 +1355,7 @@ class CutFile:
 	select cutlist and cut file
 	"""
 	def __init__(self, path, cutoptions):
-		self.path = os.path.realpath(path)
+		self.path = { 'avi': os.path.realpath(path) }
 		self.cutoptions = cutoptions
 		
 		self.filename = os.path.basename(path)
@@ -1373,7 +1373,7 @@ class CutFile:
 				for prov in self.cutoptions.defaultproviderlist:
 					try:
 						print "Wähle automatisch den Provider '%s'" % prov
-						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path)
+						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path['avi'])
 						break
 					except LookupError:
 						print "Fehlgeschlagen, nehme nächsten..."
@@ -1389,9 +1389,9 @@ class CutFile:
 			if inp.lower() == "delete" or unicode(inp.lower(),'utf8') == u"löschen":
 				s = raw_input("Soll die Datei gelöscht werden? [j/N] ").strip()
 				if s.lower() == 'j':
-					print "%s Lösche %s %s" % (C_RED, self.path, C_CLEAR)
+					print "%s Lösche %s %s" % (C_RED, self.path['avi'], C_CLEAR)
 					try:
-						os.remove(self.path)
+						os.remove(self.path['avi'])
 						raise DeletedException()
 					except OSError:
 						print "Datei konnte nicht gelöscht werden."
@@ -1415,7 +1415,7 @@ class CutFile:
 						inp = inp[len(prov):]
 						
 						print "Wechsel zu Provider '%s'" % prov
-						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path)
+						self.currentprov = self.cutoptions.cutlistprovider[prov].getView(self.path['avi'])
 						break
 				else:
 					for flag in ['test', "cat"]:
@@ -1430,7 +1430,7 @@ class CutFile:
 			if specials:
 				if self.cutlist:
 					if 'test' in specials:
-						self.cutlist.ShowCuts(self.path, is_filecut = False, tempdir = self.cutoptions.tempdir)
+						self.cutlist.ShowCuts(self.path['avi'], is_filecut = False, tempdir = self.cutoptions.tempdir)
 					if 'cat' in specials:
 						try:
 							cutlist = self.cutlist.GetRawCutList()
@@ -1468,9 +1468,9 @@ class CutFile:
 
 
 	def Cut(self):
-		self.cutpath = self.cutoptions.cutdir + self.cutname
-		self.tmppath = self.cutoptions.cutdir + self.tmpname
-		self.uncutpath = self.cutoptions.uncutdir + self.uncutname
+		self.cutpath = {'avi': self.cutoptions.cutdir + self.cutname }
+		self.tmppath = {'avi': self.cutoptions.cutdir + self.tmpname }
+		self.uncutpath = {'avi': self.cutoptions.uncutdir + self.uncutname }
 
 		print "%s Schneide %s %s" % (C_RED, self.filename, C_CLEAR)
 		print "Ausgabename: %s" % self.cutname
@@ -1492,31 +1492,33 @@ class CutFile:
 		end = time.time()
 		print "Fertig, benötigte Zeit: %ds" % int(end-start+0.5)
 			
-		if os.path.isfile(self.tmppath):
-			shutil.move(self.path, self.uncutpath)
-			shutil.move(self.tmppath, self.cutpath)
+		if os.path.isfile(self.tmppath['avi']):
+			for entry in self.path:
+				shutil.move(self.path[entry], self.uncutpath[entry])
+			for entry in self.tmppath:
+				shutil.move(self.tmppath[entry], self.cutpath[entry])
 			return True
 		else:
 			print "Schneiden war nicht erfolgreich"
 			return False
 
 	def ConvertMkv(self):
-		if os.path.splitext(self.cutpath)[1].lower() == '.ac3':
-			return
-		self.mkvpath = os.path.splitext(self.cutpath)[0] + '.mkv'
-		ac3path = os.path.splitext(self.cutpath)[0] + '.ac3'
-		print "\n%s Konvertiere %s %s" % (C_RED, self.cutpath, C_CLEAR)
+		#if os.path.splitext(self.cutpath)[1].lower() == '.ac3':
+		#	return
+		self.cutpath['mkv'] = os.path.splitext(self.cutpath['avi'])[0] + '.mkv'
+		#ac3path = os.path.splitext(self.cutpath)[0] + '.ac3'
+		print "\n%s Konvertiere %s %s" % (C_RED, self.cutpath['avi'], C_CLEAR)
 		start = time.time()
-		mkvcmd = ['mkvmerge', '-o', self.mkvpath, '--compression', '-1:none', self.cutpath]
-		if os.path.exists(ac3path):
-			mkvcmd += [ac3path]
+		mkvcmd = ['mkvmerge', '-o', self.cutpath['mkv'], '--compression', '-1:none', self.cutpath['avi']]
+		if 'ac3' in self.cutpath:
+			mkvcmd += [self.cutpath['ac3']]
 		subprocess.Popen(mkvcmd).wait()
 		end = time.time()
 		print "Konvertieren abgeschlossen, benötigte Zeit: %ds" % int(end-start+.5)
 	
 	def ValidateCut(self):		
 		print "%s Prüfe %s %s" % (C_RED, self.filename, C_CLEAR)
-		self.cutlist.ShowCuts(self.cutpath, is_filecut = True, tempdir = self.cutoptions.tempdir)
+		self.cutlist.ShowCuts(self.cutpath['avi'], is_filecut = True, tempdir = self.cutoptions.tempdir)
 		self.cutlist.PostProcessCutList()
 		
 		print
@@ -1524,10 +1526,11 @@ class CutFile:
 		if 'n' in s.lower():
 			s = raw_input("Soll die geschnitte Datei gelöscht und die Originaldatei wiederhergestellt werden? [J/n] ").strip()
 			if not 'n' in s.lower():
-				print "%s Lösche %s %s" % (C_RED, self.cutpath, C_CLEAR)
-				try:	os.remove(self.cutpath)
-				except: pass # doesn't matter
-				shutil.move(self.uncutpath, self.path)
+				for entry in self.cutpath:
+					print "%s Lösche %s %s" % (C_RED, self.cutpath[entry], C_CLEAR)
+					try:	os.remove(self.cutpath[entry])
+					except: pass # doesn't matter
+					shutil.move(self.uncutpath[entry], self.path[entry])
 				return False
 		return True
 					
@@ -1540,7 +1543,7 @@ class CutFile:
 			raise ValueError("Could not determine the quality of the file '%s'" % self.filename)
 
 	def GetAspect(self):
-		out = Run("mplayer",  ["-vo", "null", "-nosound", "-frames", "1", self.path])[0]
+		out = Run("mplayer",  ["-vo", "null", "-nosound", "-frames", "1", self.path['avi']])[0]
 		if "Movie-Aspect is 1.33:1" in out or "Film-Aspekt ist 1.33:1" in out:
 			return "4:3"
 		if "Movie-Aspect is 0.56:1" in out or "Film-Aspekt ist 0.56:1" in out:
@@ -1564,7 +1567,7 @@ class AviDemuxProjectClass:
 
 		self.filename = self.cutoptions.tempdir + "%d_project.js" % random.getrandbits(32)
 
-		self.Start(self.cutfile.path)
+		self.Start(self.cutfile.path['avi'])
 		
 		StartInFrames, DurationInFrames = self.cutlist.TimesInFrames()
 		for start, duration in zip(StartInFrames, DurationInFrames):
@@ -1640,7 +1643,7 @@ class VDProjectClass:
 		self.projectname = "%d_project.syl" % random.getrandbits(32)
 		self.filename = self.cutoptions.tempdir + self.projectname
 			
-		self.Start(self.cutfile.path)
+		self.Start(self.cutfile.path['avi'])
 			
 		self.SetAspectRatio(self.cutfile.GetAspect(),self.cutfile.GetQuality(),self.cutfile)
 			
@@ -1649,37 +1652,47 @@ class VDProjectClass:
 		for start, duration in zip(StartInFrames, DurationInFrames):
 			self.Append("VirtualDub.subset.AddRange(%d,%d);" % (start, duration))
 
-		self.End(self.cutfile.tmppath)
+		self.End(self.cutfile.tmppath['avi'])
 		self.prepareAC3()
 
 	def prepareAC3(self):
 		self.ffmpegcmd = None
 		if self.cutoptions.useac3:
-			ac3source, ac3target = self.testAC3()
-			if ac3source:
+			ac3 = self.testAC3()
+			if ac3:
 				Starts, Durations = self.cutlist.TimesInSeconds()
 				if len(Starts)>1:
 					print "More than 1 cut for ac3! Not yet implementet!"
 					return
-				self.ffmpegcmd = ['ffmpeg', '-y', '-i', ac3source, '-ss', '%f' % Starts[0],
-					'-t', '%f' % Durations[0], '-acodec', 'copy', ac3target]
+				self.ffmpegcmd = ['ffmpeg', '-y', '-i', self.cutfile.path['ac3'], '-ss', '%f' % Starts[0],
+					'-t', '%f' % Durations[0], '-acodec', 'copy', self.cutfile.tmppath['ac3']]
 
 	def testAC3(self):
+		Debug(1, "Testing for AC3")
 		if self.cutfile.GetQuality() == 'H+':
-			ac3source = os.path.splitext(self.cutfile.path)[0] + '.ac3'
+			ac3source = os.path.splitext(self.cutfile.path['avi'])[0] + '.ac3'
 			if os.path.exists(ac3source):
+				Debug(2, "AC3 found")
 				if self.cutoptions.cmd_Ac3fix:
+					Debug(2, "Testing AC3")
 					ac3tmptarget = ac3source + '.fix.ac3'
 					ac3fixcmd = ['wine', self.cutoptions.cmd_Ac3fix, ac3source, ac3tmptarget]
 					out,err=subprocess.Popen(ac3fixcmd, stdout = subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-					print "Out", out
-					print "Err", err
+					try: os.remove(ac3tmptarget)
+					except: pass
 					if "Found bad frames" in out:
 						print "AC3-File beschädigt. Benutztung würde vermutlich zu Asyncronität führen. Fahre ohne AC3 fort."
-						return None
-					ac3target =  os.path.splitext(self.cutfile.cutpath)[0] + '.ac3'
-					return ac3source, ac3target
-		return None, None
+						return False
+					Debug(2, "AC3 ok")
+					ac3target =  os.path.splitext(self.cutfile.tmppath['avi'])[0] + '.ac3'
+					ac3uncut =  os.path.splitext(self.cutfile.uncutpath['avi'])[0] + '.ac3'
+					ac3cut =  os.path.splitext(self.cutfile.cutpath['avi'])[0] + '.ac3'
+					self.cutfile.path['ac3'] = ac3source
+					self.cutfile.tmppath['ac3'] = ac3target
+					self.cutfile.uncutpath['ac3'] = ac3uncut
+					self.cutfile.cutpath['ac3'] = ac3cut
+					return True
+		return False
 
 	def Name(self):
 		return "VirtualDub"
@@ -1752,8 +1765,8 @@ class VDProjectClass:
 				sub.send_signal(9) # python >=2.6(?)
 				break
 		if self.ffmpegcmd:
-			print "Starting ffmpeg"
-			subprocess.Popen(self.ffmpegcmd, stdout = subprocess.PIPE).wait()
+			Debug(1, "starting ffmpeg with %r" % self.ffmpegcmd)
+			subprocess.Popen(self.ffmpegcmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).wait()
 
 ###
 # main function
@@ -2055,8 +2068,10 @@ def main():
 			try:
 				c.ConvertMkv()
 				if o.delavi:
-					print 'Lösche AVI-Datei %s' % c.cutpath
-					os.remove(c.cutpath)
+					for entry in c.cutpath:
+						if entry != 'mkv':
+							print 'Lösche Datei %s' % c.cutpath[entry]
+							os.remove(c.cutpath[entry])
 			except StandardError,e:
 				print e
 				print "Stacktrace:"

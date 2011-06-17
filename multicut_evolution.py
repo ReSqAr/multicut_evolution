@@ -134,7 +134,6 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         einige Angaben vor dem Hochladen abgefragt. Allerdings ist Hochladen nur
         möglich, wenn der Cutlist.at-Benutzerhash angegeben wurde.
 
-
 {BOLD}Konfigurationsdatei{CLEAR}
     In der Konfigurationsdatei zur Verfügung stehenden Einstellungen (der
     Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
@@ -206,7 +205,8 @@ ffdshow Revision 2946
     http://sourceforge.net/projects/ffdshow-tryout/files/SVN%20builds%20by%20clsid/ffdshow_rev2946_20090515_clsid.exe
 mkvmerge in beliebiger Version
     Debian Paket: mkvtoolnix; für eigene Experimente ist mkvtoolnix-gui noch ganz angenehm
-ac3fix: Zum Reparieren beschädigter Ac3-Dateien
+ac3fix: Zum Reparieren beschädigter Ac3-Dateien. Da die Reparatur nicht gut genug ist,
+    wird es hier nur verwendet, um die AC3-Dateien auf Korrektheit zu überprüfen.
     http://www.videohelp.com/tools/AC3Fix
 
 {BOLD}Avidemux Einstellungen{CLEAR}

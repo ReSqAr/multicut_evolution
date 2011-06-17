@@ -146,6 +146,8 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         avidemux_gui=
             Befehl zum Ausführen einer Avidemux-Version mit GUI.
             [default: avidemux2_qt4]
+        ac3fix=
+            Pfad von ac3fix.exe (inklusive ac3fix.exe). Default: None
         cachedir=
             Pfad zu Cache [default: ~/.cache/mutlicut/]
             Ein leerer Pfad bedeutet kein cachen.
@@ -1189,6 +1191,7 @@ class CutOptions:
 		
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
+		self.cmd_Ac3fix = None
 		self.aviDemux_saveWorkbench = True
 		self.do_rate = True
 		self.convertmkv = False
@@ -1281,6 +1284,8 @@ class CutOptions:
 						self.cmd_VirtualDub = os.path.expanduser(opt)
 					elif cmd == 'avidemux_gui':
 						self.cmd_AviDemux_Gui = os.path.expanduser(opt)
+					elif cmd == 'ac3fix':
+						self.cmd_Ac3fix = os.path.expanduser(opt)
 					elif cmd == "cachedir":
 						self.cachedir= os.path.expanduser(opt)
 
@@ -1650,16 +1655,31 @@ class VDProjectClass:
 	def prepareAC3(self):
 		self.ffmpegcmd = None
 		if self.cutoptions.useac3:
-			if self.cutfile.GetQuality() == 'H+':
-				ac3source = os.path.splitext(self.cutfile.path)[0] + '.ac3'
-				ac3target = os.path.splitext(self.cutfile.cutpath)[0] + '.ac3'
-				if os.path.exists(ac3source):
-					Starts, Durations = self.cutlist.TimesInSeconds()
-					if len(Starts)>1:
-						print "More than 1 cut for ac3! Not yet implementet!"
-						return
-					self.ffmpegcmd = ['ffmpeg', '-y', '-i', ac3source, '-ss', '%f' % Starts[0],
-						'-t', '%f' % Durations[0], '-ab', '256k', ac3target]
+			ac3source, ac3target = self.testAC3()
+			if ac3source:
+				Starts, Durations = self.cutlist.TimesInSeconds()
+				if len(Starts)>1:
+					print "More than 1 cut for ac3! Not yet implementet!"
+					return
+				self.ffmpegcmd = ['ffmpeg', '-y', '-i', ac3source, '-ss', '%f' % Starts[0],
+					'-t', '%f' % Durations[0], '-acodec', 'copy', ac3target]
+
+	def testAC3(self):
+		if self.cutfile.GetQuality() == 'H+':
+			ac3source = os.path.splitext(self.cutfile.path)[0] + '.ac3'
+			if os.path.exists(ac3source):
+				if self.cutoptions.cmd_Ac3fix:
+					ac3tmptarget = ac3source + '.fix.ac3'
+					ac3fixcmd = ['wine', self.cutoptions.cmd_Ac3fix, ac3source, ac3tmptarget]
+					out,err=subprocess.Popen(ac3fixcmd, stdout = subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+					print "Out", out
+					print "Err", err
+					if "Found bad frames" in out:
+						print "AC3-File beschädigt. Benutztung würde vermutlich zu Asyncronität führen. Fahre ohne AC3 fort."
+						return None
+					ac3target =  os.path.splitext(self.cutfile.cutpath)[0] + '.ac3'
+					return ac3source, ac3target
+		return None, None
 
 	def Name(self):
 		return "VirtualDub"

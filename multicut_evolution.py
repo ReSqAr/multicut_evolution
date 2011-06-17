@@ -1574,7 +1574,7 @@ class AviDemuxProjectClass:
 		for start, duration in zip(StartInFrames, DurationInFrames):
 			self.Append("app.addSegment(0,%d,%d);" % (start, duration))
 		
-		self.End(self.cutfile.tmppath, self.cutoptions.cmd_AviDemux_version, self.cutlist.GetFPS())
+		self.End(self.cutfile.tmppath['avi'], self.cutoptions.cmd_AviDemux_version, self.cutlist.GetFPS())
 
 	def Name(self):
 		return "Avidemux"

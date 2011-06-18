@@ -45,7 +45,7 @@ C_RED_UNDERLINE	= "\033[41;37;1;4m"
 C_BOLD			= "\033[1m"
 C_BOLD_UNDERLINE= "\033[1;4m"
 
-multicut_evolution_date = "15.05.2011"
+multicut_evolution_date = "18.06.2011"
 prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 

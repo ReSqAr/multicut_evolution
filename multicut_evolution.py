@@ -32,7 +32,7 @@ import urllib2
 import re
 import sys
 import datetime
-import getopt
+import optparse
 import hashlib
 import ast
 
@@ -49,6 +49,9 @@ multicut_evolution_date = "15.05.2011"
 prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
+#
+# Help texts
+#
 prog_help = \
 """
 Hilfe für multicut_evolution.py ({VERSION}):
@@ -1177,17 +1180,17 @@ class CutOptions:
 	"""
 	defines options used throughout the program
 	"""
-	def __init__(self, configfile = None, cmd_options = {}):
+	def __init__(self, configfile = None, options = None):
 		# init values
 		self.tempdir = tempfile.mkdtemp(prefix = "multicut_evolution")
 		self.cutdir  = os.getcwd()
 		self.uncutdir= os.getcwd()
 		self.cachedir= os.path.expanduser("~/.cache/multicut_evolution/")
 		self.author  = pwd.getpwuid(os.getuid())[0]
-		self.only_internet = cmd_options["only_internet"] if "only_internet" in cmd_options else False
-		self.no_internet = cmd_options["no_internet"] if "no_internet" in cmd_options else False
-		self.no_comments = cmd_options["no_comments"] if "no_comments" in cmd_options else False
-		self.no_suggestions = cmd_options["no_suggestions"] if "no_suggestions" in cmd_options else False
+		self.only_internet = bool(options.only_internet) if options else False
+		self.no_internet = bool(options.no_internet) if options else False
+		self.no_comments = bool(options.no_comments) if options else False
+		self.no_suggestions = bool(options.no_suggestions) if options else False
 		self.cutlistathash = ""
 		
 		self.cmd_VirtualDub = None
@@ -1773,67 +1776,49 @@ class VDProjectClass:
 # main function
 ###
 def main():
-	try:
-		opts, args = getopt.getopt(sys.argv[1:], "hniocs",
-						["help",
-							"inst-help",
-							"nocheck",
-							"only-internet",
-							"no-internet","offline",
-							"no-comments",
-							"no-suggestions",
-							"config=",
-							"verbosity="
-						]
-					)
-	except getopt.GetoptError, err:
-		print C_RED + str(err) + C_CLEAR # will print something like "option -a not recognized"
+	parser = optparse.OptionParser(add_help_option=False)
+	def error(msg):
+		print C_RED + str(msg) + C_CLEAR # will print something like "option -a not recognized"
 		print
 		print prog_help
-		sys.exit(2)
+		sys.exit(1)
+	parser.error = error
+	parser.add_option("-h", "--help", action="store_true", default=False)
+	parser.add_option("--inst-help", action="store_true", default=False)
+	parser.add_option("--config-help", action="store_true", default=False)
 	
-	failure = False
-	check_cut_files = True
-	configfile = "~/.multicut_evolution.conf"
-	cmd_options = {}
+	parser.add_option("-n", "--nocheck", action="store_true", default=False)
+	parser.add_option("-i", "--only-internet", action="store_true", default=False)
+	parser.add_option("-o","--no-internet","--offline", dest="no_internet", action="store_true", default=False)
+	parser.add_option("-c", "--no-comments", action="store_true", default=False)
+	parser.add_option("-s", "--no-suggestions", action="store_true", default=False)
 
-	for o, a in opts:
-		if o in ("-h", "--help"):
-			print prog_help
-			sys.exit()
-		elif o in ("--inst-help",):
-			print prog_inst_help
-			sys.exit()
-		elif o in ("-i", "--only-internet",):
-			cmd_options["only_internet"] = True
-		elif o in ("-o","no-internet", "offline",):
-			cmd_options["no_internet"] = True
-		elif o in ("-c","no-comments",):
-			cmd_options["no_comments"] = True
-		elif o in ("-s","no-suggestions",):
-			cmd_options["no_suggestions"] = True
-		elif o in ("-n", "--nocheck",):
-			check_cut_files = False
-		elif o in ("--config",):
-			configfile = a
-		elif o in ("--verbosity",):
-			try:
-				global VERBOSITY_LEVEL
-				VERBOSITY_LEVEL = int(a)
-				print "Setze verbosity auf %d" % VERBOSITY_LEVEL
-			except:
-				print "Parameter (%s) von '--verbosity' fehlerhaft." % a
-				failure = True
-				break
-	
-	if failure or not args:
-		if not args:
-			print C_RED + "Fehler: Keine Dateien übergeben" + C_CLEAR
-		print
+	parser.add_option("--config",dest="configfile",default="~/.multicut_evolution.conf")
+
+	parser.add_option("--verbosity",type="int",default=0)
+	parser.add_option("-v",action="count",dest="verbosity")
+
+	options, args = parser.parse_args()
+
+	global VERBOSITY_LEVEL
+	VERBOSITY_LEVEL = options.verbosity
+
+	check_cut_files = options.nocheck
+
+	if options.help:
 		print prog_help
 		sys.exit()
-	
-	o = CutOptions(configfile,cmd_options)
+	if options.config_help:
+		print prog_config_help
+		sys.exit()
+	if options.inst_help:
+		print prog_inst_help
+		sys.exit()
+
+
+	o = CutOptions(options.configfile, options)
+	return
+
 
 	###
 	# choose cutlists
@@ -2058,6 +2043,7 @@ def main():
 					c_n[1] += 1
 				else: # file was deleted
 					checkfiles.remove(c_n)
+
 	# MKV Conversion
 	if o.convertmkv:
 		print

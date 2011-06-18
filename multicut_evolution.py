@@ -1817,8 +1817,6 @@ def main():
 	global VERBOSITY_LEVEL
 	VERBOSITY_LEVEL = options.verbosity
 
-	check_cut_files = options.nocheck
-
 	if options.help:
 		print prog_help
 		sys.exit()
@@ -1981,7 +1979,7 @@ def main():
 	###
 	# check files
 	###
-	if check_cut_files:
+	if not options.nocheck:
 		###
 		# show files
 		###
@@ -2056,8 +2054,10 @@ def main():
 					c_n[1] += 1
 				else: # file was deleted
 					checkfiles.remove(c_n)
-
+	
+	###
 	# MKV Conversion
+	###
 	if o.convertmkv:
 		print
 		print

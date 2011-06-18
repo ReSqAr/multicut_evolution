@@ -1831,7 +1831,6 @@ def main():
 
 
 	o = CutOptions(options.configfile, options)
-	return
 
 
 	###

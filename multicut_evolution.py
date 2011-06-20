@@ -186,8 +186,9 @@ prog_config_help = \
         convertmkv=
             Bestimmt, ob die geschnittene AVI-Datei danach noch in MKV kopiert
             werden soll. [default: false]
-        convertonlyac3tomkv=
-            Konvertiert nur Dateien in mkv, für die eine AC3-Datei vorliegt
+        convertonlywac3tomkv=
+            Konvertiert nur Videos nach MKV, für die eine AC3-Datei vorliegt.
+            [default: false]
         delavi=
             Bestimmt, ob die AVI-Datei nach der Konvertierung in MKV gelöscht
             werden soll. [default: false]
@@ -1214,7 +1215,7 @@ class CutOptions:
 		self.aviDemux_saveWorkbench = True
 		self.do_rate = True
 		self.convertmkv = False
-		self.convertonlyac3tomkv = False
+		self.convertonlywac3tomkv = False
 		self.delavi = False
 		self.useac3 = True
 		
@@ -1335,8 +1336,8 @@ class CutOptions:
 						self.useac3 = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'convertmkv':
 						self.convertmkv = not (opt.lower()=='false' or opt=='0')
-					elif cmd == 'convertonlyac3tomkv':
-						self.convertonlyac3tomkv = not (opt.lower()=='false' or opt=='0')
+					elif cmd == 'convertonlywac3tomkv':
+						self.convertonlywac3tomkv = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'delavi':
 						self.delavi = not (opt.lower()=='false' or opt=='0')
 
@@ -2070,7 +2071,7 @@ def main():
 
 		for c in convertfiles:
 			try:
-				if o.convertonlyac3tomkv:
+				if o.convertonlywac3tomkv:
 					if not 'ac3' in c.cutpath:
 						continue
 				c.ConvertMkv()

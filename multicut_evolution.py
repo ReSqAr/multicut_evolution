@@ -178,6 +178,7 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
 	convertmkv=
 	    Bestimmt, ob die geschnittene AVI-Datei danach noch in MKV kopiert
 	    werden soll. [default: false]
+	convertonlyac3tomkv=
 	delavi=
 	    Bestimmt, ob die AVI-Datei nach der Konvertierung in MKV gelöscht
 	    werden soll. [default: false].
@@ -1196,6 +1197,7 @@ class CutOptions:
 		self.aviDemux_saveWorkbench = True
 		self.do_rate = True
 		self.convertmkv = False
+		self.convertonlyac3tomkv = False
 		self.delavi = False
 		self.useac3 = True
 		
@@ -1316,6 +1318,8 @@ class CutOptions:
 						self.useac3 = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'convertmkv':
 						self.convertmkv = not (opt.lower()=='false' or opt=='0')
+					elif cmd == 'convertonlyac3tomkv':
+						self.convertonlyac3tomkv = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'delavi':
 						self.delavi = not (opt.lower()=='false' or opt=='0')
 
@@ -1574,7 +1578,7 @@ class AviDemuxProjectClass:
 		for start, duration in zip(StartInFrames, DurationInFrames):
 			self.Append("app.addSegment(0,%d,%d);" % (start, duration))
 		
-		self.End(self.cutfile.tmppath['avi'], self.cutoptions.cmd_AviDemux_version, self.cutlist.GetFPS())
+		self.End(self.cutfile.tmppath, self.cutoptions.cmd_AviDemux_version, self.cutlist.GetFPS())
 
 	def Name(self):
 		return "Avidemux"
@@ -2067,6 +2071,9 @@ def main():
 
 		for c in convertfiles:
 			try:
+				if o.convertonlyac3tomkv:
+					if not 'ac3' in c.cutpath:
+						continue
 				c.ConvertMkv()
 				if o.delavi:
 					for entry in c.cutpath:

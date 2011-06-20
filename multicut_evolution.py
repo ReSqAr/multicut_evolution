@@ -32,7 +32,7 @@ import urllib2
 import re
 import sys
 import datetime
-import getopt
+import optparse
 import hashlib
 import ast
 
@@ -45,10 +45,13 @@ C_RED_UNDERLINE	= "\033[41;37;1;4m"
 C_BOLD			= "\033[1m"
 C_BOLD_UNDERLINE= "\033[1;4m"
 
-multicut_evolution_date = "15.05.2011"
+multicut_evolution_date = "18.06.2011"
 prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
+#
+# Help texts
+#
 prog_help = \
 """
 Hilfe für multicut_evolution.py ({VERSION}):
@@ -65,6 +68,9 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
     --inst-help
         Zeigt an, welche Programme in welchen Versionen benötigt werden und
         wie diese konfiguriert werden müssen.
+
+    --config-help
+        Gibt eine Übersicht zu den verschiedenen Optionen in der Konfigurationsdatei.
 
     -n, --nocheck
         Geschnittene Dateien werden nicht zur Überprüfung
@@ -92,8 +98,7 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         Debuginformationen werden entsprechend ausgegeben.
         [default: 0, maximal 5]
 
-
-{BOLD}Ablauf{CLEAR}
+{BOLD}Ablauf eines Schneidevorgangs{CLEAR}
     Phase 1 - Auswahl oder anlegen einer Cutlist
         Für jede angegebene Datei wird eine Cutlistübersichtsseite angegeben. Daraus
         kann man eine Cutlist auswählen, in dem man die Nummer eintippt und mit
@@ -133,55 +138,62 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         Bei eigenen Cutlists werden nachdem Überprüfen der einzelnen Schnitten
         einige Angaben vor dem Hochladen abgefragt. Allerdings ist Hochladen nur
         möglich, wenn der Cutlist.at-Benutzerhash angegeben wurde.
+""".format(VERSION=multicut_evolution_date,BOLD=C_BOLD,CLEAR=C_CLEAR)
 
-{BOLD}Konfigurationsdatei{CLEAR}
+prog_config_help = \
+"""
+{BOLD_UNDERLINE}Konfigurationsdatei{CLEAR}
     In der Konfigurationsdatei zur Verfügung stehenden Einstellungen (der
     Standardpfad für die Konfigurationsdatei ist '~/.multicut_evolution.conf'):
+        avidemux_gui=
+            Befehl zum Ausführen einer Avidemux-Version mit GUI. (Kein Pfad)
+            [default: avidemux2_qt4]
+        virtualdub=
+            Pfad zu vdub.exe [default: None]
+
         cutdir=
             Ausgabepfad [default: .]
-        uncutdir=
-            Ausgabepfad für alte Dateien [default: .]
-        virtualdub=
-            Pfad von vdub.exe [default: None]
-        avidemux_gui=
-            Befehl zum Ausführen einer Avidemux-Version mit GUI.
-            [default: avidemux2_qt4]
-        ac3fix=
-            Pfad von ac3fix.exe (inklusive ac3fix.exe). Default: None
-        cachedir=
-            Pfad zu Cache [default: ~/.cache/mutlicut/]
-            Ein leerer Pfad bedeutet kein cachen.
-        vorlauf=
-            Vorlauf bei der Überprüfung [default: 10]
-        nachlauf=
-            Nachlauf bei der Überprüfung [default: 5]
-        review=
-            Gibt an, ob nach einer Wertung gefragt werden soll. [default: true]
         cutname=
             Ausdruck für Ausgabename (s.u.) [default: {{base}}-cut{{rating}}.{{ext}}]
+        uncutdir=
+            Ausgabepfad für alte Dateien [default: .]
         uncutname=
             Ausdruck für Ausgabename (s.u.) [default: {{full}}]
+        suggestions=
+            Dateinamenvorschläge von Cutlists werden berücksichtigt. [default: true]
+
         author=
             Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
             wird. [default: Terminalbenutzername]
         cutlistathash=
             Cutlist.at-Benutzerhash, also nicht die gesamte URL sondern nur den Hash
             [default: leer]
+
         comments=
             Kommentare von OnlineTVRecorder werden angezeigt. [default: true]
-        suggestions=
-            Dateinamenvorschläge von Cutlists werden berücksichtigt. [default: true]
+        review=
+            Gibt an, ob nach einer Wertung gefragt werden soll. [default: true]
+        vorlauf=
+            Vorlauf bei der Überprüfung [default: 10]
+        nachlauf=
+            Nachlauf bei der Überprüfung [default: 5]
+
+        ac3fix=
+            Pfad von ac3fix.exe (inklusive ac3fix.exe). Default: None
         useac3=
             Bestimmt, ob AC3 sofern vorhanden in die HD-AVI gemuxt werden soll.
             Im Moment sehr experimentell! [default: false]
-
-	convertmkv=
-	    Bestimmt, ob die geschnittene AVI-Datei danach noch in MKV kopiert
-	    werden soll. [default: false]
-	convertonlyac3tomkv=
-	delavi=
-	    Bestimmt, ob die AVI-Datei nach der Konvertierung in MKV gelöscht
-	    werden soll. [default: false].
+        convertmkv=
+            Bestimmt, ob die geschnittene AVI-Datei danach noch in MKV kopiert
+            werden soll. [default: false]
+        convertonlyac3tomkv=
+            Konvertiert nur Dateien in mkv, für die eine AC3-Datei vorliegt
+        delavi=
+            Bestimmt, ob die AVI-Datei nach der Konvertierung in MKV gelöscht
+            werden soll. [default: false]
+        cachedir=
+            Pfad zu Cache [default: ~/.cache/mutlicut/]
+            Ein leerer Pfad bedeutet kein Caching von herunterladen Cutlists.
 
             
     Beschreibung der Sprache für die Namensgebung von Dateien:
@@ -191,39 +203,44 @@ Dies geschieht in mehreren Phasen, die weiter unten beschrieben werden.
         {{shortext}}   Dateiendung ohne mpg.
         {{rating}}     Bewertung der Cutlist *100
         {{full}}       Der gesamte Dateiname
-""".format(VERSION=multicut_evolution_date,BOLD=C_BOLD,CLEAR=C_CLEAR)
+""".format(BOLD_UNDERLINE=C_BOLD_UNDERLINE,BOLD=C_BOLD,CLEAR=C_CLEAR)
 
 prog_inst_help = \
 """
 {BOLD_UNDERLINE}Benötigte Programme und deren Konfiguration{CLEAR}
 
-{BOLD}Programme und Versionen{CLEAR}
-Avidemux in beliebiger Version
-Wine in beliebiger Version
-VirtualDub Version 1.7.8.28346
-    http://sourceforge.net/projects/virtualdub/files/virtualdub-win/1.7.8.28346/
-ffdshow Revision 2946
-    http://sourceforge.net/projects/ffdshow-tryout/files/SVN%20builds%20by%20clsid/ffdshow_rev2946_20090515_clsid.exe
-mkvmerge in beliebiger Version
-    Debian Paket: mkvtoolnix; für eigene Experimente ist mkvtoolnix-gui noch ganz angenehm
-ac3fix: Zum Reparieren beschädigter Ac3-Dateien. Da die Reparatur nicht gut genug ist,
-    wird es hier nur verwendet, um die AC3-Dateien auf Korrektheit zu überprüfen.
-    http://www.videohelp.com/tools/AC3Fix
+{BOLD}Programme{CLEAR}
+    {BOLD}Avidemux{CLEAR}
+        Beliebige Version
+        Ubuntu/Debian Paket: avidemux-cli avidemux-qt
+    {BOLD}Wine{CLEAR}
+        Beliebige Version
+        Ubuntu/Debian Paket: wine oder wine1.3
+    {BOLD}VirtualDub{CLEAR} (Windowsprogramm via Wine)
+        Version: 1.7.8.28346
+        Link: http://sourceforge.net/projects/virtualdub/files/virtualdub-win/1.7.8.28346/
+    {BOLD}ffdshow{CLEAR} (Windowsprogramm via Wine)
+        Version: 2946
+        Link: http://sourceforge.net/projects/ffdshow-tryout/files/SVN%20builds%20by%20clsid/ffdshow_rev2946_20090515_clsid.exe
 
-{BOLD}Avidemux Einstellungen{CLEAR}
-Hier musste etwas gemacht werden, aber ich habe wieder vergessen was. Hat mir damals Matthias gezeigt.
-Gegebenenfalls noch nachtragen.
+    {BOLD}mkvmerge{CLEAR} [optional]
+        Beliebige Version
+        Ubuntu/Debian Paket: mkvtoolnix; für eigene Experimente ist mkvtoolnix-gui noch ganz angenehm
+    {BOLD}ac3fix{CLEAR} (Windowsprogramm via Wine) [optional]
+        Zum Reparieren beschädigter AC3-Dateien. Da die Reparatur nicht gut genug ist,
+        wird es hier nur verwendet, um die AC3-Dateien auf Korrektheit zu überprüfen.
+        Link: http://www.videohelp.com/tools/AC3Fix
 
-{BOLD}VirtualDub Einstellungen{CLEAR}
-Hier musste etwas gemacht werden, aber ich habe wieder vergessen was. Hat mir damals Matthias gezeigt.
-Gegebenenfalls noch nachtragen.
-
-{BOLD}ffdshow Einstellungen{CLEAR}
-Orientiert an http://www.otrforum.com/showthread.php?t=53996&p=308679&viewfull=1#post308679
-
-Starte Konfigurationsdialog mittels
-    wine rundll32.exe ~/.wine/drive_c/windows/system32/ff_vfw.dll,configureVFW
-Danach Einstellungen setzen wie in obigem Forenbeitrag dargestellt.
+{BOLD}Konfiguration{CLEAR}
+    {BOLD}Avidemux{CLEAR}
+        [TODO]
+    {BOLD}VirtualDub{CLEAR}
+        [TODO]
+    {BOLD}ffdshow{CLEAR}
+        Wie hier beschrieben: http://www.otrforum.com/showthread.php?t=53996&p=308679&viewfull=1#post308679
+        Starte Konfigurationsdialog mittels
+            wine rundll32.exe ~/.wine/drive_c/windows/system32/ff_vfw.dll,configureVFW
+        Danach Einstellungen setzen wie in obigem Forenbeitrag dargestellt.
 """.format(BOLD=C_BOLD,BOLD_UNDERLINE=C_BOLD_UNDERLINE,CLEAR=C_CLEAR)
 
 print "multicut_evolution.py Copyright (C) 2010-2011  Yasin Zähringer (yasinzaehringer+dev@yhjz.de)"
@@ -1178,17 +1195,17 @@ class CutOptions:
 	"""
 	defines options used throughout the program
 	"""
-	def __init__(self, configfile = None, cmd_options = {}):
+	def __init__(self, configfile = None, options = None):
 		# init values
 		self.tempdir = tempfile.mkdtemp(prefix = "multicut_evolution")
 		self.cutdir  = os.getcwd()
 		self.uncutdir= os.getcwd()
 		self.cachedir= os.path.expanduser("~/.cache/multicut_evolution/")
 		self.author  = pwd.getpwuid(os.getuid())[0]
-		self.only_internet = cmd_options["only_internet"] if "only_internet" in cmd_options else False
-		self.no_internet = cmd_options["no_internet"] if "no_internet" in cmd_options else False
-		self.no_comments = cmd_options["no_comments"] if "no_comments" in cmd_options else False
-		self.no_suggestions = cmd_options["no_suggestions"] if "no_suggestions" in cmd_options else False
+		self.only_internet = bool(options.only_internet) if options else False
+		self.no_internet = bool(options.no_internet) if options else False
+		self.no_comments = bool(options.no_comments) if options else False
+		self.no_suggestions = bool(options.no_suggestions) if options else False
 		self.cutlistathash = ""
 		
 		self.cmd_VirtualDub = None
@@ -1777,67 +1794,46 @@ class VDProjectClass:
 # main function
 ###
 def main():
-	try:
-		opts, args = getopt.getopt(sys.argv[1:], "hniocs",
-						["help",
-							"inst-help",
-							"nocheck",
-							"only-internet",
-							"no-internet","offline",
-							"no-comments",
-							"no-suggestions",
-							"config=",
-							"verbosity="
-						]
-					)
-	except getopt.GetoptError, err:
-		print C_RED + str(err) + C_CLEAR # will print something like "option -a not recognized"
+	parser = optparse.OptionParser(add_help_option=False)
+	def error(msg):
+		print C_RED + str(msg) + C_CLEAR # will print something like "option -a not recognized"
 		print
 		print prog_help
-		sys.exit(2)
+		sys.exit(1)
+	parser.error = error
+	parser.add_option("-h", "--help", action="store_true", default=False)
+	parser.add_option("--inst-help", action="store_true", default=False)
+	parser.add_option("--config-help", action="store_true", default=False)
 	
-	failure = False
-	check_cut_files = True
-	configfile = "~/.multicut_evolution.conf"
-	cmd_options = {}
+	parser.add_option("-n", "--nocheck", action="store_true", default=False)
+	parser.add_option("-i", "--only-internet", action="store_true", default=False)
+	parser.add_option("-o","--no-internet","--offline", dest="no_internet", action="store_true", default=False)
+	parser.add_option("-c", "--no-comments", action="store_true", default=False)
+	parser.add_option("-s", "--no-suggestions", action="store_true", default=False)
 
-	for o, a in opts:
-		if o in ("-h", "--help"):
-			print prog_help
-			sys.exit()
-		elif o in ("--inst-help",):
-			print prog_inst_help
-			sys.exit()
-		elif o in ("-i", "--only-internet",):
-			cmd_options["only_internet"] = True
-		elif o in ("-o","no-internet", "offline",):
-			cmd_options["no_internet"] = True
-		elif o in ("-c","no-comments",):
-			cmd_options["no_comments"] = True
-		elif o in ("-s","no-suggestions",):
-			cmd_options["no_suggestions"] = True
-		elif o in ("-n", "--nocheck",):
-			check_cut_files = False
-		elif o in ("--config",):
-			configfile = a
-		elif o in ("--verbosity",):
-			try:
-				global VERBOSITY_LEVEL
-				VERBOSITY_LEVEL = int(a)
-				print "Setze verbosity auf %d" % VERBOSITY_LEVEL
-			except:
-				print "Parameter (%s) von '--verbosity' fehlerhaft." % a
-				failure = True
-				break
-	
-	if failure or not args:
-		if not args:
-			print C_RED + "Fehler: Keine Dateien übergeben" + C_CLEAR
-		print
+	parser.add_option("--config",dest="configfile",default="~/.multicut_evolution.conf")
+
+	parser.add_option("--verbosity",type="int",default=0)
+	parser.add_option("-v",action="count",dest="verbosity")
+
+	options, args = parser.parse_args()
+
+	global VERBOSITY_LEVEL
+	VERBOSITY_LEVEL = options.verbosity
+
+	if options.help:
 		print prog_help
 		sys.exit()
-	
-	o = CutOptions(configfile,cmd_options)
+	if options.config_help:
+		print prog_config_help
+		sys.exit()
+	if options.inst_help:
+		print prog_inst_help
+		sys.exit()
+
+
+	o = CutOptions(options.configfile, options)
+
 
 	###
 	# choose cutlists
@@ -1987,7 +1983,7 @@ def main():
 	###
 	# check files
 	###
-	if check_cut_files:
+	if not options.nocheck:
 		###
 		# show files
 		###
@@ -2062,7 +2058,10 @@ def main():
 					c_n[1] += 1
 				else: # file was deleted
 					checkfiles.remove(c_n)
+	
+	###
 	# MKV Conversion
+	###
 	if o.convertmkv:
 		print
 		print

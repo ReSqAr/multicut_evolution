@@ -1547,7 +1547,7 @@ class CutFile:
 		print
 		s = raw_input("Soll die geschnitte Datei angenommen werden? [J/n]: ").strip()
 		if 'n' in s.lower():
-			s = raw_input("Soll die geschnitte Datei gelöscht und die Originaldatei wiederhergestellt werden? [J/n] ").strip()
+			s = raw_input("Soll die geschnitte Datei wirklich gelöscht und die Originaldatei wiederhergestellt werden? [J/n] ").strip()
 			if not 'n' in s.lower():
 				for entry in self.cutpath:
 					print "%s Lösche %s %s" % (C_RED, self.cutpath[entry], C_CLEAR)

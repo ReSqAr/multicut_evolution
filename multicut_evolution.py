@@ -1199,7 +1199,7 @@ class CutOptions:
 	def __init__(self, configfile = None, options = None):
 		# init values
 		self.tempdir = tempfile.mkdtemp(prefix = "multicut_evolution")
-		self.cutdir  = os.getcwd()
+		self.cutdirformat = os.getcwd()
 		self.uncutdir= os.getcwd()
 		self.cachedir= os.path.expanduser("~/.cache/multicut_evolution/")
 		self.author  = pwd.getpwuid(os.getuid())[0]
@@ -1232,12 +1232,11 @@ class CutOptions:
 		
 		# enforce ending seperator
 		if not self.tempdir.endswith(os.sep):  self.tempdir  += os.sep
-		if not self.cutdir.endswith(os.sep):   self.cutdir   += os.sep
+		if not self.cutdirformat.endswith(os.sep): self.cutdirformat += os.sep
 		if not self.uncutdir.endswith(os.sep): self.uncutdir += os.sep
 		if not self.cachedir.endswith(os.sep): self.cachedir += os.sep
 		# enforce existence
-		dirs = [self.uncutdir,self.cachedir]
-		for d in dirs:
+		for d in [self.uncutdir,self.cachedir]:
 			if not os.path.exists(d):
 				Debug(4, "init: create directory: %s" % d)
 				os.makedirs(d)
@@ -1473,11 +1472,12 @@ class CutFile:
 		self.cutname = self.cutoptions.FormatString("cutname", (self.cutlist, self.filename))
 		self.tmpname = "$$$$-" + self.cutname 
 		self.uncutname = self.cutoptions.FormatString("uncutname", (self.cutlist, self.filename))
-		self.cutoptions.cutdir = os.path.expanduser(self.cutoptions.FormatString("cutdir", (self.cutlist, self.filename)))
-		if not self.cutoptions.cutdir.endswith(os.sep):   self.cutoptions.cutdir   += os.sep
-		if not os.path.exists(self.cutoptions.cutdir):
-			Debug(4, "init: create directory: %s" % self.cutoptions.cutdir)
-			os.makedirs(self.cutoptions.cutdir)
+		# set and create cutdir directory
+		self.cutdir = os.path.expanduser(self.cutoptions.FormatString("cutdir", (self.cutlist, self.filename)))
+		if not self.cutdir.endswith(os.sep): self.cutdir += os.sep
+		if not os.path.exists(self.cutdir):
+			Debug(4, "Cutfile.ChooseCutList: create directory: %s" % self.cutdir)
+			os.makedirs(self.cutdir)
 
 		if not self.cutoptions.no_suggestions:
 			cutlist_dict = self.cutlist.GetCutListDict()

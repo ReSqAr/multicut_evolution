@@ -152,7 +152,7 @@ prog_config_help = \
             Pfad zu vdub.exe [default: None]
 
         cutdir=
-            Ausgabepfad [default: .]
+            Ausdruck für Ausgabepfad [default: .]
         cutname=
             Ausdruck für Ausgabename (s.u.) [default: {{base}}-cut{{rating}}.{{ext}}]
         uncutdir=
@@ -1235,8 +1235,8 @@ class CutOptions:
 		if not self.cutdir.endswith(os.sep):   self.cutdir   += os.sep
 		if not self.uncutdir.endswith(os.sep): self.uncutdir += os.sep
 		if not self.cachedir.endswith(os.sep): self.cachedir += os.sep
-		# enforce existance
-		dirs = [self.cutdir,self.uncutdir,self.cachedir]
+		# enforce existence
+		dirs = [self.uncutdir,self.cachedir]
 		for d in dirs:
 			if not os.path.exists(d):
 				Debug(4, "init: create directory: %s" % d)
@@ -1261,7 +1261,7 @@ class CutOptions:
 			raise RuntimeError("avidemux not found")
 		
 		print "Benutze als temp-Verzeichnis: %s" % self.tempdir
-		print "Benutze als cut-Verzeichnis: %s" % self.cutdir
+		print "Benutze als cut-Verzeichnisformat: %s" % self.cutdirformat
 		print "Benutze als uncut-Verzeichnis: %s" % self.uncutdir
 		print "Benutze als cache-Verzeichnis: %s" % self.cachedir
 		print "Benutze als cutnameformat: %s" % self.cutnameformat
@@ -1298,7 +1298,7 @@ class CutOptions:
 					cmd, opt = cmd.strip(), opt.strip()
 					Debug(2, "CutOptions::ParseConfig: config read:'%s' = '%s'" % (cmd,opt))
 					if cmd == "cutdir":
-						self.cutdir  = os.path.expanduser(opt)
+						self.cutdirformat = opt
 					elif cmd == "uncutdir":
 						self.uncutdir= os.path.expanduser(opt)
 					elif cmd == "virtualdub":
@@ -1349,7 +1349,7 @@ class CutOptions:
 			pass
 	
 	def FormatString(self, name, data):
-		if name == "cutname" or name == "uncutname":
+		if name == "cutname" or name == "uncutname" or name == "cutdir":
 			cutlist, filename = data
 			format = {}
 			# cutlist relevant
@@ -1361,8 +1361,10 @@ class CutOptions:
 			format["ext"] = 'mpg.%s' % format["shortext"]
 			if name == "cutname":
 				return self.cutnameformat.format(**format)
-			else:
+			elif name == "uncutname":
 				return self.uncutnameformat.format(**format)
+			elif name == "cutdir":
+				return self.cutdirformat.format(**format)
 			
 		raise ValueError("'%s' is not valid" % name)
 
@@ -1471,6 +1473,11 @@ class CutFile:
 		self.cutname = self.cutoptions.FormatString("cutname", (self.cutlist, self.filename))
 		self.tmpname = "$$$$-" + self.cutname 
 		self.uncutname = self.cutoptions.FormatString("uncutname", (self.cutlist, self.filename))
+		self.cutoptions.cutdir = os.path.expanduser(self.cutoptions.FormatString("cutdir", (self.cutlist, self.filename)))
+		if not self.cutoptions.cutdir.endswith(os.sep):   self.cutoptions.cutdir   += os.sep
+		if not os.path.exists(self.cutoptions.cutdir):
+			Debug(4, "init: create directory: %s" % self.cutoptions.cutdir)
+			os.makedirs(self.cutoptions.cutdir)
 
 		if not self.cutoptions.no_suggestions:
 			cutlist_dict = self.cutlist.GetCutListDict()

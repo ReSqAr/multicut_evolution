@@ -1129,7 +1129,7 @@ class CutListGenerator:
 		self.filename = filename
 		self.basename = os.path.basename(filename)
 		self.tmpname = "%s_own_project.js" % random.getrandbits(32)
-		self.tmppath = self.cutlistprov.cutoptions.tempdir + self.tmpname
+		self.tmppath = os.path.join(self.cutlistprov.cutoptions.tempdir, self.tmpname)
 		self.writePreAvidemuxProject()
 		
 		#
@@ -1230,11 +1230,6 @@ class CutOptions:
 			print "Parse Konfigurationsdatei: %s" % configfile
 			self.ParseConfig(configfile)
 		
-		# enforce ending seperator
-		if not self.tempdir.endswith(os.sep):  self.tempdir  += os.sep
-		if not self.cutdirformat.endswith(os.sep): self.cutdirformat += os.sep
-		if not self.uncutdir.endswith(os.sep): self.uncutdir += os.sep
-		if not self.cachedir.endswith(os.sep): self.cachedir += os.sep
 		# enforce existence
 		for d in [self.uncutdir,self.cachedir]:
 			if not os.path.exists(d):
@@ -1474,7 +1469,6 @@ class CutFile:
 		self.uncutname = self.cutoptions.FormatString("uncutname", (self.cutlist, self.filename))
 		# set and create cutdir directory
 		self.cutdir = os.path.expanduser(self.cutoptions.FormatString("cutdir", (self.cutlist, self.filename)))
-		if not self.cutdir.endswith(os.sep): self.cutdir += os.sep
 		if not os.path.exists(self.cutdir):
 			Debug(4, "Cutfile.ChooseCutList: create directory: %s" % self.cutdir)
 			os.makedirs(self.cutdir)
@@ -1498,9 +1492,9 @@ class CutFile:
 
 
 	def Cut(self):
-		self.cutpath = {'avi': self.cutoptions.cutdir + self.cutname }
-		self.tmppath = {'avi': self.cutoptions.cutdir + self.tmpname }
-		self.uncutpath = {'avi': self.cutoptions.uncutdir + self.uncutname }
+		self.cutpath = {'avi': os.path.join(self.cutdir, self.cutname) }
+		self.tmppath = {'avi': os.path.join(self.cutdir, self.tmpname) }
+		self.uncutpath = {'avi': os.path.join(self.cutoptions.uncutdir, self.uncutname) }
 
 		print "%s Schneide %s %s" % (C_RED, self.filename, C_CLEAR)
 		print "Ausgabename: %s" % self.cutname
@@ -1595,7 +1589,7 @@ class AviDemuxProjectClass:
 		self.cutlist = cutlist
 		self.cutoptions = cutoptions
 
-		self.filename = self.cutoptions.tempdir + "%d_project.js" % random.getrandbits(32)
+		self.filename = os.path.join(self.cutoptions.tempdir, "%d_project.js" % random.getrandbits(32))
 
 		self.Start(self.cutfile.path['avi'])
 		
@@ -1671,7 +1665,7 @@ class VDProjectClass:
 		self.cutoptions = cutoptions
 
 		self.projectname = "%d_project.syl" % random.getrandbits(32)
-		self.filename = self.cutoptions.tempdir + self.projectname
+		self.filename = os.path.join(self.cutoptions.tempdir, self.projectname)
 			
 		self.Start(self.cutfile.path['avi'])
 			

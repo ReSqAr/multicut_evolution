@@ -45,7 +45,7 @@ C_RED_UNDERLINE	= "\033[41;37;1;4m"
 C_BOLD			= "\033[1m"
 C_BOLD_UNDERLINE= "\033[1;4m"
 
-multicut_evolution_date = "18.06.2011"
+multicut_evolution_date = "12.11.2011"
 prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
@@ -522,7 +522,7 @@ class CutList:
 			self.attr["metarating"] = 0.
 	
 		#
-		# init cutlist dict
+		# init cutlist dict (lazy!)
 		#
 		if cutlist_dict:
 			if not set(["frames","file","size","fps"]) <= set(cutlist_dict.keys()):
@@ -871,9 +871,15 @@ class CutListAT:
 		class View:
 			def __init__(self):
 				self.printComments()
-
+				
 				print "Hole Übersicht von cutlist.at..."
-				self.cutlists = prov.ListAll(filename)
+
+				if not prov.cutoptions.cutlistatall:
+					searchname = filename
+				else:
+					print " %s Warnung: %s Es werden Cutlists für jegliche Qualität geladen. Dies kann zu Problemen führen."%(C_RED,C_CLEAR)
+					searchname = filename.split('_TVOON_DE')[0]
+				self.cutlists = prov.ListAll(searchname)
 				print "%d Cutlist(s) gefunden" % len(self.cutlists)
 
 				if len(self.cutlists) == 0:
@@ -888,13 +894,14 @@ class CutListAT:
 			def getCutlist(self, inp, **kwargs):
 				try:
 					i = int(inp)-1
-					if 0 <= i < len(self.cutlists):
-						return self.cutlists[i]
-					else:
-						print "Illegaler Index."
-						return None
 				except:
 					print "Illegale Eingabe."
+					return None
+				
+				if 0 <= i < len(self.cutlists):
+					return self.cutlists[i]
+				else:
+					print "Illegaler Index."
 					return None
 
 			def printComments(self):
@@ -1208,6 +1215,7 @@ class CutOptions:
 		self.no_comments = bool(options.no_comments) if options else False
 		self.no_suggestions = bool(options.no_suggestions) if options else False
 		self.cutlistathash = ""
+		self.cutlistatall = False
 		
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
@@ -1320,6 +1328,8 @@ class CutOptions:
 
 					elif cmd == "review":
 						self.do_rate = not (opt.lower()=='false' or opt=='0')
+					elif cmd == "cutlistatall":
+						self.cutlistatall = (opt.lower()=='true' or opt=='1')
 					elif cmd == 'avidemux_saveworkbench':
 						self.aviDemux_saveWorkbench = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'comments':

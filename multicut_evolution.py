@@ -838,8 +838,13 @@ class CutListAT:
 		return unicode(self.Get(url), "iso-8859-1")
 	def ListAll(self, filename):
 		xml = self.searchCache.get(filename)
-		cutlists = re.findall('<cutlist row_index="\\d">.*?</cutlist>', xml, re.DOTALL)		
-		return [CutList(self,cutlist_meta_xml=cutlist) for cutlist in cutlists]
+		cutlists = re.findall('<cutlist row_index="\\d">.*?</cutlist>', xml, re.DOTALL)
+		if cutlists:
+			return [CutList(self,cutlist_meta_xml=cutlist) for cutlist in cutlists]
+		else:
+			return self.ListAll(filename.split('_TVOON_DE')[0]) if '_TVOON_DE' in filename else []
+		
+		
 	
 	def _GetCutList(self, cl_id):
 		url = "getfile.php?id=%s" % cl_id

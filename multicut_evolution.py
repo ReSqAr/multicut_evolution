@@ -793,8 +793,8 @@ class CutList:
 			
 		filename = os.path.basename(path)
 		d = random.getrandbits(32)
-		edlfile = tempdir + "%d_%s.edl" % (d,filename)
-		subfile = tempdir + "%d_%s.sub" % (d,filename)
+		edlfile = os.path.join(tempdir, "%d_%s.edl" % (d,filename))
+		subfile = os.path.join(tempdir, "%d_%s.sub" % (d,filename))
 		open(edlfile,"w").write(edl)
 		open(subfile,"w").write(sub)
 			

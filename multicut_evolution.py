@@ -28,6 +28,7 @@ import time
 import random
 import tempfile
 import traceback
+import urllib
 import urllib2
 import re
 import sys
@@ -47,7 +48,7 @@ C_RED_UNDERLINE	= "\033[41;37;1;4m"
 C_BOLD			= "\033[1m"
 C_BOLD_UNDERLINE= "\033[1;4m"
 
-multicut_evolution_date = "15.01.2012"
+multicut_evolution_date = "15.11.2012"
 prog_id = "multicut_evolution/%s" % multicut_evolution_date
 VERBOSITY_LEVEL = 0
 
@@ -167,6 +168,9 @@ prog_config_help = \
             Ausdruck für Ausgabename (s.u.) [default: {{full}}]
         suggestions=
             Dateinamenvorschläge von Cutlists werden berücksichtigt. [default: true]
+	nfo=
+	    Sucht auf IMDB nach Filmnamen und speichert IMDB-Link in .nfo ab, damit
+	    es z.B. der XBMC-Scraper nutzen kann. [default: false]
 
         author=
             Gibt den Namen an, der als Autor für selbsterstelte Cutlists verwendet
@@ -1278,6 +1282,7 @@ class CutOptions:
 		self.no_suggestions = bool(options.no_suggestions) if options else False
 		self.cutlistathash = ""
 		self.cutlistatall = False
+		self.nfo = False
 		
 		self.cmd_VirtualDub = None
 		self.cmd_AviDemux_Gui = "avidemux2_qt4"
@@ -1406,6 +1411,8 @@ class CutOptions:
 						self.convertonlywac3tomkv = not (opt.lower()=='false' or opt=='0')
 					elif cmd == 'delavi':
 						self.delavi = not (opt.lower()=='false' or opt=='0')
+					elif cmd == 'nfo':
+						self.nfo = not (opt.lower()=='false' or opt=='0')
 
 
 				except StandardError, e:
@@ -1443,14 +1450,16 @@ class DeletedException(StandardError):
 ###
 class CutFile:
 	"""
-	select cutlist and cut file
+	select cutlist and cut file, optional select imdb tt
 	"""
 	def __init__(self, path, cutoptions):
 		self.path = { 'avi': os.path.realpath(path) }
 		self.cutoptions = cutoptions
 		
 		self.filename = os.path.basename(path)
-	
+		self.opener = urllib2.build_opener()
+		self.opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+
 	def ChooseCutList(self):
 		print 
 		print "	%s %s %s" % (C_RED, self.filename, C_CLEAR)
@@ -1611,7 +1620,77 @@ class CutFile:
 		subprocess.Popen(mkvcmd).wait()
 		end = time.time()
 		print "Konvertieren abgeschlossen, benötigte Zeit: %ds" % int(end-start+.5)
+
+	def SplitIMDB(self,html):
+		parts = re.split('\d+\.</td><td valign="top">', html)
+		choices = []
+		for p in parts:
+			if not 'title/tt' in p or 'Displaying' in p:
+				continue
+			choices.append([])
+			choices[-1].append(p.split('/title/')[1].split('/')[0])
+			choices[-1].append(p.split(';">')[1].split('</a>')[0].strip())
+			choices[-1].append(p.split('</a>')[1].split('<p')[0].split('</td')[0].strip())
+		return choices
 	
+	def WriteNFO(self):
+		print "%s Finde IMDB für %s %s" % (C_RED, self.filename, C_CLEAR)
+		nice = re.match('(.*)_\d\d.\d\d.\d\d_\d\d-\d\d', self.filename).group(1)
+		replaces = { '_': ' ', 'ae': 'ä', 'oe': 'ö', 'ue': 'ü', 'Ae': 'Ä', 'Oe': 'Ö', 'Ue': 'Ü'}
+		for r in replaces:
+			nice = nice.replace(r, replaces[r])
+		retrieve = self.opener.open('http://www.imdb.com/find?q=%s&s=all' % urllib.quote(nice))
+		rawpage = unicode(retrieve.read(), 'utf-8')
+		accept = False
+		if 'title/tt' in retrieve.geturl():
+			r = rawpage.split('<h1 class="header" itemprop="name">')[1].split('</h1>')[0].split('<span class="nobr">')
+			name = r[0].strip()
+			year = r[1].split('href="')[1].split('">')[1].split('</a>')[0]
+			tt = retrieve.geturl().split('title/')[1].split('/')[0]
+			print "Exakten Treffer gefunden: %s - %s (%s)" % (tt, name, year)
+			if raw_input("Akzeptieren (J/n): ").lower() not in ['n']:
+				accept = True
+		else:
+			exact = None
+			partial = None
+			if '<p><b>Titles (Exact Matches)</b>' in rawpage:
+				exact = self.SplitIMDB(rawpage.split('<p><b>Titles (Exact Matches)</b>')[1].split('</table> </p>')[0])
+			if '<p><b>Titles (Partial Matches)</b>' in rawpage:
+				partial = self.SplitIMDB(rawpage.split('<p><b>Titles (Partial Matches)</b>')[1].split('</table> </p>')[0])
+			if exact:
+				print "Mehrere exakte Treffer gefunden"
+				for i,e in enumerate(exact):
+					print "[ %2d] %s - %s %s" % (i+1, e[0], e[1], e[2])
+				print "[ n] oder leere Eingabe: kein passender Treffer"
+				num = raw_input("Auswahl(1,1-3,1-2-9): ").strip()
+				try:
+					num = int(num)
+					accept = True
+					tt = exact[num-1][0]
+				except:
+					pass
+			if partial and not accept:
+				print "Mehrere partielle Treffer gefunden"
+				for i,e in enumerate(partial[:10] if len(partial) > 10 else partial):
+					print "[ %2d] %s - %s %s" % (i+1, e[0], e[1], e[2])
+				print "[ n] oder leere Eingabe: kein passender Treffer"
+				num = raw_input("Auswahl(1,1-3,1-2-9): ").strip()
+				try:
+					num = int(num)
+					accept = True
+					tt = partial[num-1][0]
+				except:
+					pass
+		if not accept:
+			print "Bitte geben sie die IMDB tt von Hand an!"
+			t = raw_input("IMDB tt: ").strip()
+			if re.match('tt\d\d\d\d\d\d\d', t):
+				tt = t
+				accept = True
+		if accept:
+			with open(os.path.splitext(self.cutpath['avi'])[0] + '.nfo', 'w') as f:
+				f.write('http://www.imdb.com/title/%s\n' % tt)
+
 	def ValidateCut(self):		
 		print "%s Prüfe %s %s" % (C_RED, self.filename, C_CLEAR)
 		self.cutlist.ShowCuts(self.cutpath['avi'], is_filecut = True, tempdir = self.cutoptions.tempdir)
@@ -1666,7 +1745,11 @@ class CutFile:
 				return str(sar.numerator) + ":" + str(sar.denominator)
 			else:
 				pass
-		raise Exception("Sample Aspekt Ratio konnte nicht bestimmt werden.")
+		print "Sample Aspect Ratio konnte nicht bestimmt werden!"
+		r = raw_input("Sample Aspect Ratio eingeben (Format: num:denom, Enter skips): ").strip()
+		if ':' in r:
+			return r
+		raise Exception("Sample Aspect Ratio konnte nicht bestimmt werden.")
 
 ###
 # AviDemuxProjectClass
@@ -2147,6 +2230,17 @@ def main():
 					c_n[1] += 1
 				else: # file was deleted
 					checkfiles.remove(c_n)
+	###
+	# Write NFO File with IMDB ID
+	# See http://wiki.xbmc.org/index.php?title=Nfo#Video_nfo_files_containing_an_URL
+	###
+	if o.nfo:
+		print
+		print
+		print "%s IMDB Zuordnungen von %d Datei(en) durchführen: %s" %(C_RED, len(convertfiles), C_CLEAR)
+		print
+		for c in convertfiles:
+			c.WriteNFO()
 	
 	###
 	# MKV Conversion

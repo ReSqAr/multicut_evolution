@@ -1742,7 +1742,10 @@ class CutFile:
 			m = re.search(infos_match,line)
 			if m:
 				sar = Fraction( int(m.group(3)), int(m.group(1)) )
-				return str(sar.numerator) + ":" + str(sar.denominator)
+				if sar.numerator == 427 and sar.denominator == 360:
+					return "32:27"
+				else:
+					return str(sar.numerator) + ":" + str(sar.denominator)
 			else:
 				pass
 		print "Sample Aspect Ratio konnte nicht bestimmt werden!"

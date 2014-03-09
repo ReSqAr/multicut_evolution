@@ -36,6 +36,7 @@ import datetime
 import optparse
 import hashlib
 import ast
+import fcntl
 
 import base64
 from fractions import Fraction
@@ -1948,19 +1949,37 @@ class VDProjectClass:
 		sub = subprocess.Popen(args = 'WINEPREFIX=' + winedir + '/wine' + " wine  %s /x /s %s" % (self.cutoptions.cmd_VirtualDub,self.projectname),
 											shell = True, stderr = subprocess.PIPE, stdout = subprocess.PIPE)
 		
-		
+		# Make read calls non blocking
+		# from https://stackoverflow.com/questions/8980050/persistent-python-subprocess
+		fcntl.fcntl(sub.stderr.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
 		errtext = ''
 		while True:
 			if sub.poll() != None:
 				break
-			
-			adderrtxt = sub.stderr.read(1)
+			try:
+				output = subprocess.check_output(['wmctrl', '-l'], stderr=subprocess.PIPE)
+				windows = output.split('\n')
+				windows = [w for w in windows if 'virtualdub' in w.lower()]
+				if windows:
+					parts = windows[0].split()
+					parts = [p for p in parts if '%' in p]
+					print '\rProgress', parts[0],
+					sys.stdout.flush()
+			except Exception as e:
+				#print e
+				pass
+			try:
+				adderrtxt = sub.stderr.read()
+			except IOError:
+				continue
 			if adderrtxt == '\n':
 				Debug(4, errtext.rpartition('\n')[-1])
 			errtext += adderrtxt
 			if 'fixme:avifile:AVIFileExit' in errtext:
 				sub.send_signal(9) # python >=2.6(?)
 				break
+			time.sleep(0.3)
+		print
 		if self.ffmpegcmd:
 			Debug(1, "starting ffmpeg with %r" % self.ffmpegcmd)
 			subprocess.Popen(self.ffmpegcmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE).wait()
